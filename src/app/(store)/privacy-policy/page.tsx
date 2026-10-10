@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
         </li>
         <li>
           <strong>Technical information:</strong> our hosting provider keeps standard server logs. To prevent misuse of
-          the order form we store a one-way, non-reversible fingerprint of the network address an order was placed from.
+          the order form we store a hashed fingerprint of the network address an order was placed from.
         </li>
       </ul>
 

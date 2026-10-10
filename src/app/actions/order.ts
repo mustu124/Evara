@@ -147,8 +147,8 @@ async function clientHash(): Promise<string | null> {
   const h = await headers();
   const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "";
   if (!ip) return null;
-  const salt = process.env.ORDER_RATE_LIMIT_SALT ?? "evara";
-  return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
+  // Stored only as a hash, and only to count recent orders from the same address.
+  return createHash("sha256").update(`evara-orders:${ip}`).digest("hex");
 }
 
 /**

@@ -42,7 +42,6 @@ Fill in `.env.local` from **Supabase → Project Settings → API**:
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | browser + server | Publishable key (`sb_publishable_…`). On older projects use `NEXT_PUBLIC_SUPABASE_ANON_KEY` with the anon key instead. |
 | `SUPABASE_SECRET_KEY` | **server only** | Secret key (`sb_secret_…`). On older projects use `SUPABASE_SERVICE_ROLE_KEY`. Never prefix with `NEXT_PUBLIC_`. |
 | `NEXT_PUBLIC_SITE_URL` | SEO metadata, sitemap | e.g. `http://localhost:3000` locally, your real domain in production |
-| `ORDER_RATE_LIMIT_SALT` | **server only** | Any long random string |
 | `WHATSAPP_NUMBER` | **server only**, optional | Fallback only. The number is normally set in Admin → Settings. |
 
 `.env.local` is git-ignored. Never commit real keys.
@@ -91,7 +90,6 @@ Open <http://localhost:3000>. Sign in at <http://localhost:3000/admin/login>.
    - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (or `NEXT_PUBLIC_SUPABASE_ANON_KEY`)
    - `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) — mark as *Sensitive*
    - `NEXT_PUBLIC_SITE_URL` — your production URL, no trailing slash
-   - `ORDER_RATE_LIMIT_SALT` — mark as *Sensitive*
 4. Deploy. Changing a `NEXT_PUBLIC_*` variable later requires a redeploy.
 5. Add your domain under **Project Settings → Domains**, then update `NEXT_PUBLIC_SITE_URL` to match and redeploy.
 
@@ -145,7 +143,7 @@ Overview · Orders · Products (details, pack sizes, options, specifications, im
 - **Row Level Security on every table.** The public can read only published products, active categories/collections, published reviews and public settings. Orders and customer details are readable only by administrators.
 - **Administrator checks happen on the server and in the database**, not in the UI: the admin layout, every server action and the RLS policies each verify the role (stored in `profiles.role`, which users cannot change).
 - **Orders can only be created by `create_order()`**, which the browser roles are not permitted to execute.
-- **Abuse protection:** at most 5 orders per hour per client address (stored only as a salted hash) and per phone number, plus a honeypot field.
+- **Abuse protection:** at most 5 orders per hour per client address (stored only as a hash) and per phone number, plus a honeypot field.
 - **Uploads:** administrators only; file type is verified from the file's contents; 4 MB limit; random file names; buckets enforce their own size and MIME limits.
 - The secret key is read only in server-only modules and maintenance scripts and is never sent to the browser.
 
