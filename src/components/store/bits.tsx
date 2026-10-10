@@ -16,7 +16,7 @@ export function SectionHeading({ eyebrow, title, intro }: { eyebrow?: string; ti
 export function PageHeader({ eyebrow, title, intro, children }: { eyebrow?: string; title: string; intro?: string; children?: React.ReactNode }) {
   return (
     <div className="border-b border-line bg-blush-light">
-      <div className="container-x py-12 text-center sm:py-16">
+      <div className="container-x py-8 text-center sm:py-10">
         {eyebrow && <p className="eyebrow">{eyebrow}</p>}
         <h1 className="mt-3 text-4xl sm:text-5xl">{title}</h1>
         {intro && <p className="mx-auto mt-4 max-w-xl text-muted">{intro}</p>}

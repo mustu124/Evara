@@ -12,7 +12,7 @@ export default async function ShopPage({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader eyebrow="Evara Studios" title="Shop" intro="Every piece is handcrafted in wax. Choose your design, hue and scent." />
-      <div className="container-x py-12 sm:py-16">
+      <div className="container-x py-8 sm:py-10">
         <ProductListing basePath="/shop" searchParams={await searchParams} />
       </div>
     </>

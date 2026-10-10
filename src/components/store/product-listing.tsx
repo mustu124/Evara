@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { Suspense } from "react";
 import { EmptyState } from "@/components/store/bits";
 import { SortSelect } from "@/components/store/filter-bar";
@@ -64,38 +65,85 @@ async function ProductListingContent({ basePath, searchParams, fixedCategory, fi
     return <EmptyState title={emptyTitle ?? "Nothing here yet"} body={emptyBody} action={{ href: "/shop", label: "Browse all products" }} />;
   }
 
-  // Leaf categories (the ones that actually hold products), in catalog order.
-  const chipCategories = categories
-    .filter((c) => !c.parent_id)
-    .flatMap((root) => {
-      const children = categories.filter((c) => c.parent_id === root.id);
-      return children.length ? children : [root];
-    });
-  const activeCategory = fixedCategory ?? values.category;
-  const chip = (active: boolean) => `choice !min-h-10 whitespace-nowrap ${active ? "choice-selected" : ""}`;
+  // One compact row of main categories; a main category's sub-categories appear
+  // in a second, smaller row only while that category is open.
+  const mainCategories = categories.filter((c) => !c.parent_id);
+  const activeSlug = fixedCategory ?? values.category;
+  const activeCategory = categories.find((c) => c.slug === activeSlug);
+  const activeMain = activeCategory?.parent_id ? categories.find((c) => c.id === activeCategory.parent_id) : activeCategory;
+  const subCategories = activeMain ? categories.filter((c) => c.parent_id === activeMain.id) : [];
+  const comingSoon = categories.filter((c) => c.is_coming_soon);
+  const chip = (active: boolean, small = false) =>
+    `choice shrink-0 whitespace-nowrap ${small ? "!min-h-9 !gap-1.5 !px-3 text-[0.8rem]" : "!min-h-10 !gap-1.5 !px-3.5 text-[0.85rem]"} ${active ? "choice-selected" : ""}`;
+  // Phones and tablets: the row scrolls sideways instead of wrapping down the page.
+  // Laptops: everything fits on one line because "coming soon" categories fold into one menu.
+  const row = "-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] sm:-mx-8 sm:px-8 lg:mx-0 lg:flex-wrap lg:overflow-visible lg:px-0 lg:pb-0 [&::-webkit-scrollbar]:hidden";
+  const soon = <span className="text-xs text-muted">soon</span>;
+  const foldOnLaptop = (c: { is_coming_soon: boolean }) => (c.is_coming_soon ? "lg:hidden" : "");
 
   return (
     <>
-      {!fixedCollection && chipCategories.length > 0 && (
-        <nav aria-label="Categories" className="mb-8">
-          <ul className="flex flex-wrap gap-2.5">
+      {!fixedCollection && mainCategories.length > 0 && (
+        <nav aria-label="Categories" className="mb-8 space-y-2.5">
+          <ul className={row}>
             <li>
-              <Link href="/shop" className={chip(!activeCategory)} aria-current={!activeCategory ? "page" : undefined}>
+              <Link href="/shop" className={chip(!activeSlug)} aria-current={!activeSlug ? "page" : undefined}>
                 All
               </Link>
             </li>
-            {chipCategories.map((c) => {
-              const active = activeCategory === c.slug;
+            {mainCategories.map((c) => {
+              const active = activeMain?.id === c.id;
               return (
-                <li key={c.id}>
-                  <Link href={`/shop?category=${c.slug}`} className={chip(active)} aria-current={active ? "page" : undefined}>
+                <li key={c.id} className={foldOnLaptop(c)}>
+                  <Link href={`/shop?category=${c.slug}`} className={chip(active)} aria-current={activeSlug === c.slug ? "page" : undefined}>
                     {c.name}
-                    {c.is_coming_soon && <span className="text-xs text-muted">(coming soon)</span>}
+                    {c.is_coming_soon && soon}
                   </Link>
                 </li>
               );
             })}
+            {comingSoon.length > 0 && (
+              <li className="relative hidden lg:block">
+                <details className="group">
+                  <summary className={`${chip(Boolean(activeCategory?.is_coming_soon))} list-none [&::-webkit-details-marker]:hidden`}>
+                    Coming soon
+                    <ChevronDown aria-hidden className="size-3.5 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <ul className="card absolute left-0 top-full z-20 mt-2 w-60 space-y-0.5 p-2 shadow-lift">
+                    {comingSoon.map((c) => (
+                      <li key={c.id}>
+                        <Link
+                          href={`/shop?category=${c.slug}`}
+                          aria-current={activeSlug === c.slug ? "page" : undefined}
+                          className={`block rounded-lg px-3 py-2 text-sm hover:bg-blush-light ${activeSlug === c.slug ? "bg-blush-light font-medium" : ""}`}
+                        >
+                          {c.name}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              </li>
+            )}
           </ul>
+
+          {activeMain && subCategories.length > 0 && (
+            <ul className={row} aria-label={`${activeMain.name} types`}>
+              <li>
+                <Link href={`/shop?category=${activeMain.slug}`} className={chip(activeSlug === activeMain.slug, true)} aria-current={activeSlug === activeMain.slug ? "page" : undefined}>
+                  All {activeMain.name}
+                </Link>
+              </li>
+              {subCategories.map((c) => (
+                <li key={c.id} className={foldOnLaptop(c)}>
+                  <Link href={`/shop?category=${c.slug}`} className={chip(activeSlug === c.slug, true)} aria-current={activeSlug === c.slug ? "page" : undefined}>
+                    {c.name}
+                    {c.is_coming_soon && soon}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </nav>
       )}
 
