@@ -1,0 +1,24 @@
+# dependencies
+node_modules/
+
+# next.js / vercel
+.next/
+out/
+.vercel/
+next-env.d.ts
+*.tsbuildinfo
+
+# secrets — never commit real credentials
+.env
+.env.*
+!.env.example
+
+# source brief: the requirements PDF contains account passwords
+/Website Requirements/
+
+# misc
+.DS_Store
+Thumbs.db
+npm-debug.log*
+coverage/
+supabase/.temp/

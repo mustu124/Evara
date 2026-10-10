@@ -1,0 +1,150 @@
+@import "tailwindcss";
+
+@theme {
+  /*
+   * Evara design tokens. These are the only colours the site uses.
+   *
+   *   canvas       main page background (warm ivory)             ~50%
+   *   blush        signature blush: feature bands, accents       ~25% with blush-light
+   *   blush-light  quieter pink band, selected states, hovers
+   *   ivory        raised surfaces: cards, header, inputs        ~15%
+   *   copper       primary buttons, prices, active states, rules  ~7%
+   *   copper-dark  hover of copper, small copper text
+   *   cocoa        text and the footer                            ~3%
+   *   muted        secondary text
+   *   line         fine borders
+   *   whatsapp     WhatsApp's own green, for its icon only
+   */
+  --color-canvas: #f8f1ed;
+  --color-ivory: #fff9f5;
+  --color-blush: #e8c5c0;
+  --color-blush-light: #f3e2de;
+  --color-copper: #a96340;
+  --color-copper-dark: #874a2e;
+  --color-cocoa: #55372d;
+  --color-muted: #75635d;
+  --color-line: #e0c9c1;
+  --color-whatsapp: #25d366;
+
+  --font-serif: var(--font-cormorant), "Cormorant Garamond", Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-inter), "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  --shadow-soft: 0 1px 2px rgb(85 55 45 / 0.05), 0 6px 18px -10px rgb(85 55 45 / 0.16);
+  --shadow-lift: 0 2px 4px rgb(85 55 45 / 0.06), 0 16px 32px -16px rgb(85 55 45 / 0.26);
+
+  --animate-fade-up: fade-up 0.6s ease-out both;
+  @keyframes fade-up {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+  }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas font-sans text-cocoa antialiased;
+    font-size: 1rem;
+    line-height: 1.65;
+  }
+  h1, h2, h3, h4 {
+    @apply font-serif text-cocoa;
+    font-weight: 500;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  ::selection {
+    @apply bg-blush text-cocoa;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-copper);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  button, [role="button"], summary, label[for], select {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  dialog::backdrop {
+    background: rgb(85 55 45 / 0.45);
+  }
+}
+
+@layer components {
+  .container-x {
+    @apply mx-auto w-full max-w-6xl px-5 sm:px-8;
+  }
+  /* The one deliberately uppercase, letter-spaced label style. */
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] text-copper-dark;
+  }
+  .section {
+    @apply py-14 sm:py-20;
+  }
+
+  .btn-primary,
+  .btn-outline,
+  .btn-quiet {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-center text-[0.95rem] font-medium transition-colors duration-200 disabled:opacity-50;
+  }
+  /* Primary: copper with light text, deeper copper on hover. */
+  .btn-primary {
+    @apply bg-copper text-ivory hover:bg-copper-dark;
+  }
+  /* Secondary: ivory with a copper border and cocoa text. */
+  .btn-outline {
+    @apply border border-copper bg-ivory text-cocoa hover:bg-blush-light;
+  }
+  .btn-quiet {
+    @apply border border-line bg-ivory text-cocoa hover:border-copper hover:bg-blush-light;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-cocoa;
+  }
+  .input {
+    @apply block min-h-11 w-full rounded-lg border border-line bg-ivory px-3.5 py-2 text-[0.95rem] text-cocoa transition-colors placeholder:text-muted/70 hover:border-copper/60 focus:border-copper focus:outline-none focus:ring-2 focus:ring-copper/25 disabled:bg-blush-light disabled:text-muted;
+  }
+  .field-error {
+    @apply mt-1.5 text-sm font-medium text-cocoa;
+  }
+  .card {
+    @apply rounded-xl border border-line bg-ivory shadow-soft;
+  }
+  /* Choice pills (pack size, hue, scent, category): ivory by default, light blush with a copper border when chosen. */
+  .choice {
+    @apply inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-ivory px-4 text-sm text-cocoa transition-colors hover:border-copper;
+  }
+  .choice-selected {
+    @apply border-copper bg-blush-light font-medium shadow-[inset_0_0_0_1px_var(--color-copper)];
+  }
+  .choice-disabled {
+    @apply cursor-not-allowed border-dashed text-muted hover:border-line;
+  }
+
+  .prose-evara p {
+    @apply mb-5 leading-[1.8] text-cocoa/90;
+  }
+  .prose-evara h2 {
+    @apply mb-3 mt-10 text-2xl;
+  }
+  .prose-evara ul {
+    @apply mb-5 list-disc space-y-2 pl-5 text-cocoa/90 marker:text-copper;
+  }
+  .prose-evara a {
+    @apply text-copper-dark underline underline-offset-4 hover:text-cocoa;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
