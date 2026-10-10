@@ -76,12 +76,12 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             </div>
             <div>
               <dt className="text-xs font-medium uppercase tracking-wider text-muted">Phone</dt>
-              <dd className="mt-0.5"><a href={`tel:+91${order.customer_phone}`} className="text-copper underline underline-offset-4">+91 {order.customer_phone}</a></dd>
+              <dd className="mt-0.5"><a href={`tel:+91${order.customer_phone}`} className="text-copper-dark underline underline-offset-4">+91 {order.customer_phone}</a></dd>
             </div>
             {order.customer_email && (
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wider text-muted">Email</dt>
-                <dd className="mt-0.5 break-all"><a href={`mailto:${order.customer_email}`} className="text-copper underline underline-offset-4">{order.customer_email}</a></dd>
+                <dd className="mt-0.5 break-all"><a href={`mailto:${order.customer_email}`} className="text-copper-dark underline underline-offset-4">{order.customer_email}</a></dd>
               </div>
             )}
             <div>

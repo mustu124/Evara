@@ -9,7 +9,7 @@
    *   blush-light  quieter pink band, selected states, hovers
    *   ivory        raised surfaces: cards, header, inputs        ~15%
    *   copper       primary buttons, prices, active states, rules  ~7%
-   *   copper-dark  hover of copper, small copper text
+   *   copper-dark  hover of copper, and copper-coloured text (readable contrast)
    *   cocoa        text and the footer                            ~3%
    *   muted        secondary text
    *   line         fine borders
@@ -20,7 +20,7 @@
   --color-blush: #e8c5c0;
   --color-blush-light: #f3e2de;
   --color-copper: #a96340;
-  --color-copper-dark: #874a2e;
+  --color-copper-dark: #82472b;
   --color-cocoa: #55372d;
   --color-muted: #75635d;
   --color-line: #e0c9c1;
@@ -93,7 +93,7 @@
   }
   /* Primary: copper with light text, deeper copper on hover. */
   .btn-primary {
-    @apply bg-copper text-ivory hover:bg-copper-dark;
+    @apply bg-copper text-white hover:bg-copper-dark;
   }
   /* Secondary: ivory with a copper border and cocoa text. */
   .btn-outline {
@@ -133,7 +133,7 @@
     @apply mb-3 mt-10 text-2xl;
   }
   .prose-evara ul {
-    @apply mb-5 list-disc space-y-2 pl-5 text-cocoa/90 marker:text-copper;
+    @apply mb-5 list-disc space-y-2 pl-5 text-cocoa/90 marker:text-copper-dark;
   }
   .prose-evara a {
     @apply text-copper-dark underline underline-offset-4 hover:text-cocoa;

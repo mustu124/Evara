@@ -153,7 +153,7 @@ async function ProductListingContent({ basePath, searchParams, fixedCategory, fi
           {values.q && (
             <>
               {" "}for &ldquo;{values.q}&rdquo; &middot;{" "}
-              <Link href={basePath} className="text-copper underline underline-offset-4">clear search</Link>
+              <Link href={basePath} className="text-copper-dark underline underline-offset-4">clear search</Link>
             </>
           )}
         </p>

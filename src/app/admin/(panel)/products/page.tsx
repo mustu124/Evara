@@ -88,7 +88,7 @@ export default async function AdminProductsPage({ searchParams }: { searchParams
                   {src && <Image src={src} alt="" fill sizes="52px" className="object-cover" />}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <Link href={`/admin/products/${p.id}`} className="font-medium text-cocoa hover:text-copper">{p.name}</Link>
+                  <Link href={`/admin/products/${p.id}`} className="font-medium text-cocoa hover:text-copper-dark">{p.name}</Link>
                   <p className="truncate text-xs text-muted">
                     {category?.name ?? "No category"} ·{" "}
                     {prices.length ? (Math.min(...prices) === Math.max(...prices) ? formatINR(prices[0]) : `${formatINR(Math.min(...prices))} – ${formatINR(Math.max(...prices))}`) : "No price"}

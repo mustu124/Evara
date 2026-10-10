@@ -34,7 +34,7 @@ function Row({ product }: { product: InventoryRow }) {
   return (
     <li className="grid gap-3 p-4 lg:grid-cols-[1.4fr_auto_6.5rem_6.5rem_auto_auto] lg:items-center">
       <div className="min-w-0">
-        <Link href={`/admin/products/${product.id}`} className="font-medium text-cocoa hover:text-copper">{product.name}</Link>
+        <Link href={`/admin/products/${product.id}`} className="font-medium text-cocoa hover:text-copper-dark">{product.name}</Link>
         <div className="mt-1 flex flex-wrap gap-1.5">
           <ProductStatusBadge status={product.status} />
           {!product.track_inventory ? (

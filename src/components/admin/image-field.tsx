@@ -61,7 +61,7 @@ export function ImageField({ bucket, folder, value, onChange, label = "Image", a
           <span className="absolute inset-0 flex items-center justify-center text-xs text-muted">No image</span>
         )}
         {busy && (
-          <span className="absolute inset-0 flex items-center justify-center bg-ivory/70 text-copper" role="status">
+          <span className="absolute inset-0 flex items-center justify-center bg-ivory/70 text-copper-dark" role="status">
             <Spinner />
             <span className="sr-only">Uploading</span>
           </span>

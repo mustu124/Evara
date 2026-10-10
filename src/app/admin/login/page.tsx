@@ -27,7 +27,7 @@ export default async function AdminLoginPage() {
           )}
         </div>
         <p className="mt-6 text-center text-sm">
-          <Link href="/" className="text-copper underline underline-offset-4">Back to the store</Link>
+          <Link href="/" className="text-copper-dark underline underline-offset-4">Back to the store</Link>
         </p>
       </div>
     </main>

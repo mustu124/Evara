@@ -25,8 +25,8 @@ export default async function AdminHomepagePage() {
         <BestsellerPicker products={(products.data ?? []) as { id: string; name: string; status: ProductStatus; is_bestseller: boolean }[]} />
         <Panel title="Category and collection images" description="Categories with an image appear as picture cards in Shop by Category; collection images fill the Shop by Collection cards.">
           <div className="flex flex-wrap gap-3 text-sm">
-            <Link href="/admin/categories" className="text-copper underline underline-offset-4">Manage category images</Link>
-            <Link href="/admin/collections" className="text-copper underline underline-offset-4">Manage collection images</Link>
+            <Link href="/admin/categories" className="text-copper-dark underline underline-offset-4">Manage category images</Link>
+            <Link href="/admin/collections" className="text-copper-dark underline underline-offset-4">Manage collection images</Link>
             <span className="text-muted">Gallery photos are chosen per product, under Products → Images.</span>
           </div>
         </Panel>

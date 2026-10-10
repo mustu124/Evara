@@ -27,7 +27,7 @@ export function AdminShell({ email, children }: { email: string; children: React
   return (
     <div className="lg:grid lg:min-h-dvh lg:grid-cols-[15rem_1fr]">
       <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-ivory px-4 lg:hidden">
-        <span className="font-serif text-xl tracking-[0.25em] text-copper">EVARA</span>
+        <span className="font-serif text-xl tracking-[0.25em] text-copper-dark">EVARA</span>
         <button type="button" className="flex size-10 items-center justify-center rounded-lg hover:bg-blush/30" aria-expanded={open} aria-controls="admin-nav" aria-label={open ? "Close menu" : "Open menu"} onClick={() => setOpen((v) => !v)}>
           {open ? <X aria-hidden className="size-5" /> : <Menu aria-hidden className="size-5" />}
         </button>
@@ -35,7 +35,7 @@ export function AdminShell({ email, children }: { email: string; children: React
 
       <aside id="admin-nav" className={`${open ? "block" : "hidden"} border-b border-line bg-ivory lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:border-b-0 lg:border-r`}>
         <div className="hidden px-6 pb-2 pt-7 lg:block">
-          <p className="font-serif text-2xl tracking-[0.28em] text-copper">EVARA</p>
+          <p className="font-serif text-2xl tracking-[0.28em] text-copper-dark">EVARA</p>
           <p className="mt-0.5 text-xs uppercase tracking-[0.16em] text-muted">Admin</p>
         </div>
         <nav aria-label="Admin" className="flex-1 overflow-y-auto p-3">
@@ -43,7 +43,7 @@ export function AdminShell({ email, children }: { email: string; children: React
             {NAV.map(({ href, label, icon: Icon }) => (
               <li key={href}>
                 <Link href={href} onClick={() => setOpen(false)} aria-current={isActive(href) ? "page" : undefined} className={`flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm transition-colors ${isActive(href) ? "bg-blush/60 font-medium text-cocoa" : "text-cocoa hover:bg-blush/30"}`}>
-                  <Icon aria-hidden className="size-4 text-copper" strokeWidth={1.75} /> {label}
+                  <Icon aria-hidden className="size-4 text-copper-dark" strokeWidth={1.75} /> {label}
                 </Link>
               </li>
             ))}
@@ -51,11 +51,11 @@ export function AdminShell({ email, children }: { email: string; children: React
         </nav>
         <div className="space-y-1 border-t border-line p-3">
           <Link href="/" target="_blank" className="flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm text-cocoa hover:bg-blush/30">
-            <ExternalLink aria-hidden className="size-4 text-copper" strokeWidth={1.75} /> View store
+            <ExternalLink aria-hidden className="size-4 text-copper-dark" strokeWidth={1.75} /> View store
           </Link>
           <form action={signOut}>
             <button type="submit" className="flex min-h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm text-cocoa hover:bg-blush/30">
-              <LogOut aria-hidden className="size-4 text-copper" strokeWidth={1.75} /> Sign out
+              <LogOut aria-hidden className="size-4 text-copper-dark" strokeWidth={1.75} /> Sign out
             </button>
           </form>
           <p className="truncate px-3 pb-1 pt-2 text-xs text-muted" title={email}>{email}</p>

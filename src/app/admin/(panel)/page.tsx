@@ -78,14 +78,14 @@ export default async function AdminOverviewPage() {
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
-        <Panel title="Recent orders" actions={<Link href="/admin/orders" className="text-sm text-copper underline underline-offset-4">View all</Link>}>
+        <Panel title="Recent orders" actions={<Link href="/admin/orders" className="text-sm text-copper-dark underline underline-offset-4">View all</Link>}>
           {orders.length === 0 ? (
             <AdminEmpty title="No orders yet" body="Orders placed through the store will appear here." />
           ) : (
             <ul className="divide-y divide-line">
               {orders.map((o) => (
                 <li key={o.id}>
-                  <Link href={`/admin/orders/${o.id}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 hover:text-copper">
+                  <Link href={`/admin/orders/${o.id}`} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3 hover:text-copper-dark">
                     <span>
                       <span className="font-medium">{o.reference}</span>
                       <span className="block text-xs text-muted">{o.customer_name} · {formatDate(o.created_at)}</span>
@@ -102,14 +102,14 @@ export default async function AdminOverviewPage() {
           )}
         </Panel>
 
-        <Panel title="Low stock" actions={<Link href="/admin/inventory" className="text-sm text-copper underline underline-offset-4">Inventory</Link>}>
+        <Panel title="Low stock" actions={<Link href="/admin/inventory" className="text-sm text-copper-dark underline underline-offset-4">Inventory</Link>}>
           {lowStock.length === 0 ? (
             <p className="text-sm text-muted">No tracked products are running low.</p>
           ) : (
             <ul className="divide-y divide-line">
               {lowStock.map((p) => (
                 <li key={p.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <Link href={`/admin/products/${p.id}`} className="hover:text-copper">{p.name}</Link>
+                  <Link href={`/admin/products/${p.id}`} className="hover:text-copper-dark">{p.name}</Link>
                   <span className={p.stock_quantity === 0 ? "font-semibold text-cocoa" : "font-medium text-copper-dark"}>{p.stock_quantity} left</span>
                 </li>
               ))}

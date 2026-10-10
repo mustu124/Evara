@@ -11,7 +11,7 @@ import type { Category, Collection } from "@/lib/types";
 type Props = { categories: Category[]; collections: Collection[] };
 
 const linkClass = (active: boolean) =>
-  `border-b-2 py-1 text-[0.95rem] font-medium transition-colors hover:text-copper ${active ? "border-copper text-copper" : "border-transparent text-cocoa"}`;
+  `border-b-2 py-1 text-[0.95rem] font-medium transition-colors hover:text-copper-dark ${active ? "border-copper text-copper-dark" : "border-transparent text-cocoa"}`;
 
 export function SiteHeader({ categories, collections }: Props) {
   const pathname = usePathname();
@@ -61,7 +61,7 @@ export function SiteHeader({ categories, collections }: Props) {
                 <div className="card grid grid-cols-2 gap-x-8 gap-y-1 bg-ivory p-6 shadow-lift">
                   {roots.map((root) => (
                     <div key={root.id} className="break-inside-avoid py-1">
-                      <Link href={`/categories/${root.slug}`} className="text-[0.95rem] text-cocoa hover:text-copper">
+                      <Link href={`/categories/${root.slug}`} className="text-[0.95rem] text-cocoa hover:text-copper-dark">
                         {root.name}
                         {root.is_coming_soon && comingSoon}
                       </Link>
@@ -69,7 +69,7 @@ export function SiteHeader({ categories, collections }: Props) {
                         <ul className="mb-2 mt-1.5 space-y-1 border-l border-line pl-3">
                           {childrenOf(root.id).map((c) => (
                             <li key={c.id}>
-                              <Link href={`/categories/${c.slug}`} className="text-sm text-muted hover:text-copper">
+                              <Link href={`/categories/${c.slug}`} className="text-sm text-muted hover:text-copper-dark">
                                 {c.name}
                                 {c.is_coming_soon && comingSoon}
                               </Link>
@@ -93,7 +93,7 @@ export function SiteHeader({ categories, collections }: Props) {
                 <ul className="card space-y-2 bg-ivory p-6 shadow-lift">
                   {collections.map((c) => (
                     <li key={c.id}>
-                      <Link href={`/collections/${c.slug}`} className="text-[0.95rem] text-cocoa hover:text-copper">
+                      <Link href={`/collections/${c.slug}`} className="text-[0.95rem] text-cocoa hover:text-copper-dark">
                         {c.name}
                       </Link>
                     </li>
@@ -110,7 +110,7 @@ export function SiteHeader({ categories, collections }: Props) {
         <div className="col-start-3 flex items-center justify-end gap-1">
           <button
             type="button"
-            className="flex size-11 items-center justify-center rounded-full text-cocoa hover:bg-blush hover:text-copper"
+            className="flex size-11 items-center justify-center rounded-full text-cocoa hover:bg-blush hover:text-copper-dark"
             aria-expanded={searching}
             aria-controls="site-search"
             aria-label={searching ? "Close search" : "Search products"}
@@ -121,10 +121,10 @@ export function SiteHeader({ categories, collections }: Props) {
           >
             {searching ? <X aria-hidden className="size-5" strokeWidth={1.5} /> : <Search aria-hidden className="size-5" strokeWidth={1.5} />}
           </button>
-          <Link href="/cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`} className="relative flex size-11 items-center justify-center rounded-full text-cocoa hover:bg-blush hover:text-copper">
+          <Link href="/cart" aria-label={`Cart, ${count} item${count === 1 ? "" : "s"}`} className="relative flex size-11 items-center justify-center rounded-full text-cocoa hover:bg-blush hover:text-copper-dark">
             <ShoppingBag aria-hidden className="size-5" strokeWidth={1.5} />
             {count > 0 && (
-              <span className="absolute right-0.5 top-0.5 flex min-w-5 items-center justify-center rounded-full bg-copper px-1 text-[0.68rem] font-medium leading-5 text-ivory">
+              <span className="absolute right-0.5 top-0.5 flex min-w-5 items-center justify-center rounded-full bg-copper-dark px-1 text-[0.68rem] font-medium leading-5 text-white">
                 {count > 99 ? "99+" : count}
               </span>
             )}

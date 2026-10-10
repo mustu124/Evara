@@ -165,7 +165,7 @@ export function CartView() {
   if (confirmation) {
     return (
       <div className="mx-auto max-w-xl py-6 text-center">
-        <ArchOrnament className="mx-auto w-20 text-copper" />
+        <ArchOrnament className="mx-auto w-20 text-copper-dark" />
         <p className="eyebrow mt-6">One last step</p>
         <h2 className="mt-3 text-4xl">Send your order on WhatsApp</h2>
         <p className="mt-4 text-muted">
@@ -207,19 +207,19 @@ export function CartView() {
         </div>
 
         <ol className="mx-auto mt-10 max-w-md space-y-3 text-left text-sm text-cocoa/90">
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper">1.</span> Tap &ldquo;Open WhatsApp&rdquo; and press send on the prefilled message.</li>
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper">2.</span> We will reply to confirm availability, delivery and payment details.</li>
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper">3.</span> Your order is confirmed only once we have replied. No payment has been taken.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">1.</span> Tap &ldquo;Open WhatsApp&rdquo; and press send on the prefilled message.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">2.</span> We will reply to confirm availability, delivery and payment details.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">3.</span> Your order is confirmed only once we have replied. No payment has been taken.</li>
         </ol>
 
         <details className="mx-auto mt-8 max-w-md text-left">
-          <summary className="text-sm text-copper underline underline-offset-4">View the message</summary>
+          <summary className="text-sm text-copper-dark underline underline-offset-4">View the message</summary>
           <pre className="mt-3 whitespace-pre-wrap rounded-xl border border-line bg-ivory p-4 font-sans text-sm text-cocoa">{confirmation.message}</pre>
         </details>
 
         <button
           type="button"
-          className="mt-10 text-sm text-muted underline underline-offset-4 hover:text-copper"
+          className="mt-10 text-sm text-muted underline underline-offset-4 hover:text-copper-dark"
           onClick={() => {
             try {
               window.sessionStorage.removeItem(LAST_ORDER_KEY);
@@ -273,9 +273,9 @@ export function CartView() {
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="flex items-start justify-between gap-3">
                     <h2 className="text-xl leading-snug sm:text-2xl">
-                      <Link href={`/shop/${line.slug}`} className="hover:text-copper">{line.name}</Link>
+                      <Link href={`/shop/${line.slug}`} className="hover:text-copper-dark">{line.name}</Link>
                     </h2>
-                    <p className="shrink-0 font-semibold text-copper">{formatINR(line.unitPrice * line.quantity)}</p>
+                    <p className="shrink-0 font-semibold text-copper-dark">{formatINR(line.unitPrice * line.quantity)}</p>
                   </div>
                   <dl className="mt-1 space-y-0.5 text-sm text-muted">
                     <div className="flex gap-1.5"><dt>Pack size:</dt><dd className="text-cocoa">{line.variantLabel}</dd></div>
@@ -287,11 +287,11 @@ export function CartView() {
                   {problem && <p role="alert" className="field-error">{problem}</p>}
                   <div className="mt-3 flex items-center justify-between">
                     <div className="inline-flex items-center rounded-full border border-line bg-ivory" role="group" aria-label={`Quantity for ${line.name}`}>
-                      <button type="button" className="flex size-10 items-center justify-center rounded-full hover:text-copper disabled:opacity-30" aria-label="Decrease quantity" disabled={line.quantity <= 1} onClick={() => { setLineErrors({}); cart.setQuantity(line.key, line.quantity - 1); }}>
+                      <button type="button" className="flex size-10 items-center justify-center rounded-full hover:text-copper-dark disabled:opacity-30" aria-label="Decrease quantity" disabled={line.quantity <= 1} onClick={() => { setLineErrors({}); cart.setQuantity(line.key, line.quantity - 1); }}>
                         <Minus aria-hidden className="size-3.5" />
                       </button>
                       <output className="w-8 text-center text-sm tabular-nums" aria-live="polite">{line.quantity}</output>
-                      <button type="button" className="flex size-10 items-center justify-center rounded-full hover:text-copper disabled:opacity-30" aria-label="Increase quantity" disabled={line.quantity >= MAX_LINE_QUANTITY} onClick={() => { setLineErrors({}); cart.setQuantity(line.key, line.quantity + 1); }}>
+                      <button type="button" className="flex size-10 items-center justify-center rounded-full hover:text-copper-dark disabled:opacity-30" aria-label="Increase quantity" disabled={line.quantity >= MAX_LINE_QUANTITY} onClick={() => { setLineErrors({}); cart.setQuantity(line.key, line.quantity + 1); }}>
                         <Plus aria-hidden className="size-3.5" />
                       </button>
                     </div>
@@ -305,7 +305,7 @@ export function CartView() {
           })}
         </ul>
 
-        <Link href="/shop" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm text-copper hover:text-copper-dark">
+        <Link href="/shop" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm text-copper-dark hover:text-copper-dark">
           <ArrowLeft aria-hidden className="size-4" /> Continue shopping
         </Link>
 
@@ -385,7 +385,7 @@ export function CartView() {
             </div>
             <div className="flex items-baseline justify-between border-t border-line pt-4 text-base">
               <dt className="font-medium text-cocoa">Total</dt>
-              <dd className="text-2xl font-semibold text-copper">{formatINR(total)}</dd>
+              <dd className="text-2xl font-semibold text-copper-dark">{formatINR(total)}</dd>
             </div>
           </dl>
 

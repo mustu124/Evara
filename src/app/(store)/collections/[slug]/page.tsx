@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!collection) return { title: "Collection not found" };
   return {
     title: collection.name,
-    description: collection.description || `The ${collection.name} collection by Evara Studios.`,
+    description: collection.description || `The ${collection.name} collection by Evara Studios: artisan candles handcrafted in wax for the occasion.`,
     alternates: { canonical: `/collections/${collection.slug}` },
   };
 }

@@ -54,7 +54,7 @@ export default async function HomePage() {
                       </>
                     ) : (
                       <>
-                        <ArchOrnament className="w-10 text-copper sm:w-12" />
+                        <ArchOrnament className="w-10 text-copper-dark sm:w-12" />
                         <span className="mt-3 font-serif text-xl text-cocoa sm:text-[1.7rem]">{c.name}</span>
                         <span className="mt-1 text-xs text-muted sm:text-sm">{c.is_coming_soon ? "Coming soon" : "Explore"}</span>
                       </>
@@ -136,7 +136,7 @@ export default async function HomePage() {
               {testimonials.map((t) => (
                 <li key={t.id} className="card flex flex-col p-7">
                   {t.rating && (
-                    <p className="mb-4 flex gap-0.5 text-copper" aria-label={`${t.rating} out of 5 stars`}>
+                    <p className="mb-4 flex gap-0.5 text-copper-dark" aria-label={`${t.rating} out of 5 stars`}>
                       {Array.from({ length: t.rating }, (_, i) => (
                         <Star key={i} aria-hidden className="size-4 fill-current" />
                       ))}

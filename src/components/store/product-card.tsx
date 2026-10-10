@@ -41,7 +41,7 @@ export function ProductCard({ product, priority }: { product: ProductSummary; pr
         </h3>
         {from && (
           <p className="mt-auto flex flex-wrap items-baseline gap-x-2 pt-2">
-            <span className="text-base font-semibold text-copper">
+            <span className="text-base font-semibold text-copper-dark">
               {hasRange ? "From " : ""}
               {formatINR(from.price)}
             </span>

@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!category) return { title: "Category not found" };
   return {
     title: category.name,
-    description: category.description || `${category.name} by Evara Studios.`,
+    description: category.description || `Shop ${category.name.toLowerCase()} by Evara Studios: artisan candles handcrafted in wax, with your choice of design, hue and scent.`,
     alternates: { canonical: `/categories/${category.slug}` },
   };
 }

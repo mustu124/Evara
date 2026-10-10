@@ -91,7 +91,8 @@ Open <http://localhost:3000>. Sign in at <http://localhost:3000/admin/login>.
    - `SUPABASE_SECRET_KEY` (or `SUPABASE_SERVICE_ROLE_KEY`) — mark as *Sensitive*
    - `NEXT_PUBLIC_SITE_URL` — your production URL, no trailing slash
 4. Deploy. Changing a `NEXT_PUBLIC_*` variable later requires a redeploy.
-5. Add your domain under **Project Settings → Domains**, then update `NEXT_PUBLIC_SITE_URL` to match and redeploy.
+5. Add your domain under **Project Settings → Domains**, then update `NEXT_PUBLIC_SITE_URL` to match and redeploy. Until this is your real address, the sitemap, canonical links and social-share links point at the wrong site.
+6. After the first deploy, open the live site and run through the manual checklist in section 5.
 
 No Vercel API keys or tokens are needed anywhere in this project.
 
@@ -105,8 +106,8 @@ No Vercel API keys or tokens are needed anywhere in this project.
 
 | Route | Purpose |
 | --- | --- |
-| `/` | Full-width hero, categories, bestsellers, collections, gallery, reviews |
-| `/shop` | All products with search, category / collection / availability filters, sorting, pagination |
+| `/` | Full-width hero, the main categories, bestsellers, collections, gallery, reviews |
+| `/shop` | All products with a category bar, sorting and pagination; search opens from the header icon on every page |
 | `/shop/[slug]` | Product page: gallery, pack size and option selectors, quantity, specifications, related products |
 | `/categories/[slug]`, `/collections/[slug]`, `/collections` | Scoped listings |
 | `/cart` | Cart, delivery details and WhatsApp hand-off |
@@ -174,72 +175,76 @@ npm run build       # production build
 2. On *Daisy Bowl Jar Candle*, switching to **Set of 2** changes the price from ₹299 to ₹579.
 3. On *Fruit Shot Glass Candle*, **Orange** and **Green Apple** are labelled coming soon and cannot be selected.
 4. Add two different hue/scent combinations: the cart shows two lines; refresh keeps them.
-5. With no WhatsApp number set, the cart explains that ordering is unavailable. Set the number in Admin → Settings and reload.
+5. Clear the WhatsApp number in Admin → Settings: the cart explains that ordering is unavailable. Set it again and reload.
 6. Complete checkout: you see an order reference, WhatsApp opens with the full message, and the order appears in Admin → Orders as **Pending / Unpaid**.
 7. In the admin, change a price and confirm the storefront updates; upload, reorder, replace and delete a product image; mark an order Confirmed and Paid.
 8. Sign out and confirm `/admin` redirects to the login page.
 
 ---
 
-## 6. Status
+## 6. Production-readiness checklist
 
-**Built and verified in this repository**
+Last audited on 10 October 2026 against a local **production build** (`next build` + `next start`) connected to the live Supabase project.
 
-- Type check, lint and production build pass.
-- 43 automated tests pass (database logic, security policies, validation, WhatsApp message).
-- The storefront was exercised in a real browser (desktop and mobile widths) against a local stand-in backend running the real schema and seed data:
-  - all 37 internal URLs reachable from the navigation return 200, and unknown products, categories and collections return a real 404;
-  - clicking every product image and card (home, shop, category, related products, gallery) opens the matching product;
-  - search, category / collection / availability filters, all sort orders and pagination fallbacks;
-  - coming-soon categories and empty collections show honest empty states;
-  - every pack size shows its own current and original price; coming-soon values are disabled; choosing a design or hue switches the photo;
-  - cart: separate lines per combination, quantity changes, removal, persistence across refresh, and server re-pricing after tampering with stored prices;
-  - checkout validation, order creation, the confirmation screen and the generated `wa.me` link opening WhatsApp;
-  - skip link, mobile menu, and no horizontal overflow on mobile.
+### Completed and tested
 
-**Executed against the live Supabase project**
+| Area | What was run | Result |
+| --- | --- | --- |
+| Build | `npm run build`, `npm run typecheck`, `npm run lint` | Pass, no warnings |
+| Automated tests | `npm test` (database logic, access policies, validation, WhatsApp message) | 43 of 43 pass |
+| Supabase connectivity, schema, policies | `npm run db:verify` against the live project | 45 of 45 pass |
+| Public routes and navigation | Browser crawl of the production build | 53 internal URLs return 200; all 37 required routes exist and are linked; unknown URLs return a real 404 |
+| Product information and image mapping | Every product page compared with the brief | Name, description, every pack price and original price, every option value, coming-soon values disabled, specifications, photo count, and the right photo per option, for all 5 products |
+| Product navigation | Clicking each product photo and card | Opens the matching product |
+| Responsive layouts | 10 pages at 360, 390, 768, 1024 and 1440 px | No sideways scrolling; mobile menu works |
+| SEO | 16 pages | Unique titles, descriptions, one h1, canonical URLs, social tags, favicon, product structured data, `robots.txt`, `sitemap.xml` (36 URLs), `noindex` on admin |
+| Accessibility | axe-core (WCAG 2 A/AA) on 10 pages, desktop and phone | No violations after fixes; skip link, keyboard selection and visible focus work |
+| Cart and pricing | Browser test on the production build (44 checks, 3 consecutive clean runs) | Separate lines per variant, merging, quantities, removal, totals, persistence across refresh and tabs |
+| Stale and unavailable data | Same test | Browser-edited prices replaced; changed prices shown; unavailable options and insufficient stock block checkout; stock lost mid-checkout is refused by the server |
+| Order creation and WhatsApp | Same test | Order stored pending and unpaid with a unique reference; `wa.me` link to the configured number, fully URL-encoded, with every required detail; opening WhatsApp leaves the order pending; blocked pop-up fallback and Copy message work; emulated phone works |
+| Admin authentication and authorization | Browser test on the production build with temporary accounts (70 checks) | Signed-out and non-admin users cannot reach any admin page or change anything, even with a valid session or a direct database token; open admin forms submitted without an admin session change nothing |
+| Product CRUD, inventory, storage uploads | Same test | Create, edit, publish, unpublish, archive, delete; pack sizes, options, specifications; image upload, reorder, replace, delete (files removed from storage; fake images rejected); stock tracking enforced on orders |
+| Order status management | Same test | Search, filters, details, status and payment updates, cancel confirmation, revenue counted only when paid |
+| Cache refresh after admin edits | Same test, on the cached production build | A newly published product, a price change, an unpublish, new categories and settings changes each appeared on the storefront immediately |
+| Secrets | Scan of the production browser bundle and of every committed file | The secret key is in neither; `.env.local` and the brief folder are git-ignored |
+| Dependencies | `npm audit --omit=dev` | 0 known vulnerabilities in what is deployed |
 
-- Migrations applied (by the project owner, in the SQL Editor); all 13 tables exist.
-- `npm run db:storage`: four public buckets, 5 MB limit, image-only MIME allow-list.
-- `npm run db:seed`: 16 categories, 6 collections, 5 products, 16 pack sizes, 48 option values, 19 photos, 3 settings.
-- `npm run db:verify`: 44 checks passed. Storage upload rules; every product compared with the brief; a visitor's key cannot read orders or change anything; a test order was priced by the database (ignoring a tampered price), stored as pending/unpaid, then deleted.
-- Admin panel and access control, driven in a real browser with temporary accounts (70 checks passed, twice):
-  - *Unauthenticated:* all admin pages redirect to login; no registration is offered; wrong passwords are rejected.
-  - *Signed-in non-admin:* cannot sign in to the admin; with a genuine session cookie every admin page still redirects; with their token the database refuses reading orders, changing prices, creating/archiving/deleting products, updating orders or settings, self-promotion, uploads and deletes.
-  - *Server actions:* an already-open admin form submitted with a non-admin session, or with no session, changes nothing.
-  - *Administrator:* sign in/out; dashboard statistics and revenue; product create (with validation), edit, publish, unpublish, archive, permanent delete; pack sizes, sale price, colour option, specifications; image upload, reorder, replace, delete (files removed from storage; a fake image is rejected); inventory (stock shown on the storefront and enforced on orders); category and collection create/edit/delete; order search, filters, details, status and payment updates, cancel confirmation; hero text, section visibility, bestsellers, reviews; WhatsApp number and store settings. Each change was confirmed in the database and, where relevant, on the storefront.
-  - All temporary users, products, images, orders and settings changes were removed afterwards.
+All test accounts, products, images and orders created by these tests were removed afterwards.
 
-- Cart and WhatsApp checkout, driven in a real browser against the live project (45 checks; 4 consecutive clean runs after one unexplained client-side miss in which no order request was sent):
-  - *Cart:* empty state; separate lines per pack size and option combination; identical combinations merge; photos, options, line subtotals and grand total; quantity up/down; remove; persistence across refresh and across tabs.
-  - *Stale data:* browser-edited prices are replaced by database prices; a price changed by the shop shows the new price and total; an option that became unavailable is flagged and blocks checkout; stock is counted in pieces across lines; stock that runs out between review and submit is refused by the server with the cart kept intact.
-  - *Checkout:* field validation; order created as pending/unpaid with a unique reference; `https://wa.me/<number>?text=` link, fully URL-encoded (newlines, `&`, `#`, `+`, `%`, the rupee sign) and containing every required detail; opening WhatsApp twice leaves the order pending/unpaid; reference survives a refresh.
-  - *Failure cases:* with no number configured the cart says so and disables checkout; with pop-ups blocked the customer gets a notice, a real link and a working Copy message button.
-  - *Mobile (emulated Pixel 7):* no sideways scrolling; tapping Open WhatsApp goes to WhatsApp for the configured number.
-  - The WhatsApp number for these runs was a placeholder supplied only to the local test server; nothing was written to the store settings. Test orders and temporary catalog tweaks were removed.
+### Completed in the live Supabase project
 
-**Executed locally only**
+- Migrations applied; four public storage buckets created with size and type limits; catalog seeded (16 categories, 6 collections, 5 products, 16 pack sizes, 48 option values, 19 product photos).
+- WhatsApp number set to 918369440340.
+- One administrator account exists and has signed in successfully.
 
-- 43 automated tests of the migrations, order function, stock handling and access policies (`npm test`).
-- `npm run db:migrate` (applied and idempotent against a local Postgres-protocol server; the live project was migrated through the SQL Editor instead).
-- The storefront route and link sweep described above ran against a local stand-in backend.
+### Not tested
 
-**Not yet done: needs the project owner**
+- **The Vercel deployment itself.** The site has not been deployed. Everything above ran on a local production build, not on Vercel's servers.
+- **A real WhatsApp message.** The tests open the WhatsApp link but never press send, so receipt of an order on the business phone has not been confirmed.
+- **Real phones and other browsers.** Phone checks used an emulated device in Microsoft Edge; Safari, iOS and Firefox were not tested.
+- **`npm run db:migrate` against Supabase.** It was tested against a local Postgres-protocol server only; the live project was migrated through the SQL Editor.
+- **Load and concurrency.** No performance or load testing was done.
+- One of four checkout runs on the production build stopped at order creation for a reason that could not be reproduced in the three runs that followed.
 
-- Create your administrator: `npm run db:admin -- you@example.com`. No admin account exists in the live project.
-- Set the WhatsApp number in Admin -> Settings; checkout stays disabled until then.
-- Turn off public sign-ups in Supabase -> Authentication (new sign-ups get no privileges either way).
-- Deployment to Vercel. *The site has not been deployed*, and cache purging after admin edits was observed only in development mode.
+### Manual steps still required
 
-**Things to review**
+1. **Deploy:** import the repository in Vercel and add the four environment variables from section 3.
+2. **Set `NEXT_PUBLIC_SITE_URL`** to the real domain in Vercel. It is `http://localhost:3000` locally, and the sitemap, canonical links and social-share links use it.
+3. **Turn off public sign-ups** in Supabase → Authentication → Sign In / Providers. New sign-ups get no privileges either way.
+4. **Send one real test order** from the deployed site and confirm the WhatsApp message arrives.
+5. **Change the passwords** listed in the original requirements PDF, which stores them in plain text.
 
-- **Policy pages** were written to describe how this site actually works, but they are general and are not legal advice. Delivery timelines, refund terms and business details must be confirmed by Evara Studios.
-- **Bestsellers:** the brief did not say which products sell best, so the seed features all five. Adjust in Admin → Homepage.
-- **Founders' names** (Neehal, Tanishq) were taken from the photo file names. Edit them in Admin → Homepage if needed.
-- **WhatsApp number, email and Instagram** were not supplied and are intentionally blank.
+### Things to review
+
+- **Policy pages** describe how this site works but are general and are not legal advice. Delivery timelines, refund terms and business details must be confirmed by Evara Studios.
+- **Bestsellers:** the brief did not say which products sell best, so all five are featured. Adjust in Admin → Homepage.
+- **Collection and category photos** reuse the supplied candle photos as stand-ins. Eight of the nine main category cards have no photo. Replace or add them in Admin → Collections and Admin → Categories.
+- **Collections are empty:** no products are assigned to any collection yet.
+- **Founders' names** (Neehal, Tanishq) were taken from the photo file names.
+- **Email and Instagram** were not supplied and are blank, so they are hidden on the site.
 - **Customer reviews:** none were supplied, so the section is hidden until genuine reviews are added in Admin → Homepage.
-- **Hero photos:** the hero is a full-width banner, as on the reference site. The supplied photos are portrait (9:16, 900 px wide), so on wide screens only the middle band shows and it is enlarged. Uploading landscape photos of at least 1920 px in Admin -> Homepage will look sharper.
-- Only the five documented products are seeded. Other categories and all collections are seeded empty and show a "coming soon" or "to be unveiled" message.
+- **Hero photos** are portrait and 900 px wide, so they look soft in the full-width banner on large screens. Landscape photos of at least 1920 px will look sharper.
+- **Development tooling** (the test runner and linter, not deployed) has open advisories reported by `npm audit`. They are pinned because newer versions need a newer Node.js than 22.12.
 
 ## 7. Project layout
 

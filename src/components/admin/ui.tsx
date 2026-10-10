@@ -10,7 +10,7 @@ export const adminInput =
 export const adminLabel = "mb-1 block text-xs font-medium text-muted";
 export const adminBtn =
   "inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors disabled:opacity-50";
-export const btnPrimary = `${adminBtn} bg-copper text-ivory hover:bg-copper-dark`;
+export const btnPrimary = `${adminBtn} bg-copper text-white hover:bg-copper-dark`;
 export const btnSecondary = `${adminBtn} border border-line bg-ivory text-cocoa hover:border-blush hover:bg-blush/30`;
 export const btnDanger = `${adminBtn} border border-blush bg-ivory text-copper-dark hover:bg-blush/40`;
 

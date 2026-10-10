@@ -43,7 +43,7 @@ export default async function AboutPage() {
                   <p key={i} className="whitespace-pre-line">{p}</p>
                 ),
               )}
-              <Link href="/shop" className="btn-primary mt-4 !text-ivory !no-underline">Shop the candles</Link>
+              <Link href="/shop" className="btn-primary mt-4 !text-white !no-underline">Shop the candles</Link>
             </article>
           </div>
         )}

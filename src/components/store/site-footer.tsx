@@ -14,7 +14,7 @@ const POLICIES = [
 ];
 
 const heading = "mb-4 font-serif text-xl text-ivory";
-const link = "text-sm text-ivory/75 transition-colors hover:text-blush hover:underline hover:underline-offset-4";
+const link = "inline-flex min-h-6 items-center text-sm text-ivory/75 transition-colors hover:text-blush hover:underline hover:underline-offset-4";
 
 export function instagramHandle(url: string): string {
   const match = url.match(/instagram\.com\/([^/?#]+)/i);
@@ -39,7 +39,7 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
 
         <nav aria-label="Shop">
           <h2 className={heading}>Shop</h2>
-          <ul className="space-y-2.5">
+          <ul className="space-y-1.5">
             <li><Link href="/shop" className={link}>All products</Link></li>
             {roots.map((c) => (
               <li key={c.id}>
@@ -51,7 +51,7 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
 
         <nav aria-label="Company">
           <h2 className={heading}>Evara</h2>
-          <ul className="space-y-2.5">
+          <ul className="space-y-1.5">
             <li><Link href="/about" className={link}>Our story</Link></li>
             <li><Link href="/collections" className={link}>Collections</Link></li>
             <li><Link href="/contact" className={link}>Contact</Link></li>
@@ -67,21 +67,21 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
             <ul className="space-y-3">
               {whatsapp && (
                 <li>
-                  <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={`${link} inline-flex items-center gap-2.5`}>
+                  <a href={whatsapp} target="_blank" rel="noopener noreferrer" className={`${link} gap-2.5`}>
                     <WhatsAppIcon className="size-4 shrink-0 text-whatsapp" /> {store.phone_display || "WhatsApp us"}
                   </a>
                 </li>
               )}
               {store.instagram_url && (
                 <li>
-                  <a href={store.instagram_url} target="_blank" rel="noopener noreferrer" className={`${link} inline-flex items-center gap-2.5`}>
+                  <a href={store.instagram_url} target="_blank" rel="noopener noreferrer" className={`${link} gap-2.5`}>
                     <InstagramIcon className="size-4 shrink-0 text-blush" /> {instagramHandle(store.instagram_url)}
                   </a>
                 </li>
               )}
               {store.email && (
                 <li>
-                  <a href={`mailto:${store.email}`} className={`${link} inline-flex items-center gap-2.5 break-all`}>
+                  <a href={`mailto:${store.email}`} className={`${link} gap-2.5 break-all`}>
                     <Mail aria-hidden className="size-4 shrink-0 text-blush" strokeWidth={1.5} /> {store.email}
                   </a>
                 </li>

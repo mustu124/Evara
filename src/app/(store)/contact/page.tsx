@@ -35,7 +35,7 @@ export default async function ContactPage() {
             {cards.map((c) => (
               <li key={c.key}>
                 <a href={c.href} {...(c.external ? { target: "_blank", rel: "noopener noreferrer" } : {})} className="card group flex h-full flex-col items-center p-8 text-center transition-shadow hover:shadow-lift">
-                  <span className="flex size-14 items-center justify-center rounded-full bg-blush-light text-copper">{c.icon}</span>
+                  <span className="flex size-14 items-center justify-center rounded-full bg-blush-light text-copper-dark">{c.icon}</span>
                   <span className="mt-5 font-serif text-2xl text-cocoa">{c.title}</span>
                   <span className="mt-1 break-all text-sm font-medium text-copper-dark group-hover:underline group-hover:underline-offset-4">{c.value}</span>
                 </a>

@@ -66,7 +66,7 @@ export function Breadcrumbs({ items }: { items: { href?: string; label: string }
           <li key={i} className="flex items-center gap-x-2">
             {i > 0 && <span aria-hidden>/</span>}
             {item.href ? (
-              <Link href={item.href} className="hover:text-copper">{item.label}</Link>
+              <Link href={item.href} className="hover:text-copper-dark">{item.label}</Link>
             ) : (
               <span aria-current="page" className="font-medium text-cocoa">{item.label}</span>
             )}

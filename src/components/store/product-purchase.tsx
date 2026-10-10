@@ -127,7 +127,7 @@ export function ProductPurchase({ product, children }: { product: ProductDetail;
 
         {variant && (
           <p className="mt-5 flex flex-wrap items-baseline gap-x-3" aria-live="polite">
-            <span className="text-3xl font-semibold text-copper">{formatINR(variant.price)}</span>
+            <span className="text-3xl font-semibold text-copper-dark">{formatINR(variant.price)}</span>
             {variant.compare_at_price !== null && variant.compare_at_price > variant.price && (
               <s className="text-lg text-muted">
                 <span className="sr-only">Original price </span>
@@ -194,11 +194,11 @@ export function ProductPurchase({ product, children }: { product: ProductDetail;
             <div>
               <span className="field-label" id="qty-label">Quantity</span>
               <div className="inline-flex items-center rounded-full border border-line bg-ivory" role="group" aria-labelledby="qty-label">
-                <button type="button" className="flex size-11 items-center justify-center rounded-full hover:text-copper disabled:opacity-30" aria-label="Decrease quantity" disabled={!purchasable || qty <= 1} onClick={() => { setQuantity(qty - 1); setAdded(false); }}>
+                <button type="button" className="flex size-11 items-center justify-center rounded-full hover:text-copper-dark disabled:opacity-30" aria-label="Decrease quantity" disabled={!purchasable || qty <= 1} onClick={() => { setQuantity(qty - 1); setAdded(false); }}>
                   <Minus aria-hidden className="size-4" />
                 </button>
                 <output className="w-9 text-center tabular-nums" aria-live="polite">{qty}</output>
-                <button type="button" className="flex size-11 items-center justify-center rounded-full hover:text-copper disabled:opacity-30" aria-label="Increase quantity" disabled={!purchasable || qty >= maxQuantity} onClick={() => { setQuantity(qty + 1); setAdded(false); }}>
+                <button type="button" className="flex size-11 items-center justify-center rounded-full hover:text-copper-dark disabled:opacity-30" aria-label="Increase quantity" disabled={!purchasable || qty >= maxQuantity} onClick={() => { setQuantity(qty + 1); setAdded(false); }}>
                   <Plus aria-hidden className="size-4" />
                 </button>
               </div>
@@ -221,7 +221,7 @@ export function ProductPurchase({ product, children }: { product: ProductDetail;
           <p aria-live="polite" className="min-h-6 text-sm text-muted">
             {added && (
               <>
-                Added to your cart. <Link href="/cart" className="text-copper underline underline-offset-4">View cart</Link>
+                Added to your cart. <Link href="/cart" className="text-copper-dark underline underline-offset-4">View cart</Link>
               </>
             )}
           </p>

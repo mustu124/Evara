@@ -101,7 +101,7 @@ export default async function ProductPage({ params }: Props) {
                 {product.collections.map((c, i) => (
                   <span key={c.id}>
                     {i > 0 && ", "}
-                    <Link href={`/collections/${c.slug}`} className="text-copper underline underline-offset-4">{c.name}</Link>
+                    <Link href={`/collections/${c.slug}`} className="text-copper-dark underline underline-offset-4">{c.name}</Link>
                   </span>
                 ))}
               </p>
