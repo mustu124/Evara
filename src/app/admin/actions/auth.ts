@@ -16,13 +16,21 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
 
   const supabase = await createSessionClient();
   const { data, error } = await supabase.auth.signInWithPassword(parsed.data);
-  if (error || !data.user) return { error: "Incorrect email or password." };
+  if (error || !data.user) {
+    // Say what Supabase actually refused, so a wrong password is not confused with a setup problem.
+    if (error?.code === "invalid_credentials") return { error: "Incorrect email or password." };
+    if (error?.code === "email_not_confirmed") return { error: "This email address has not been confirmed yet. Confirm it in Supabase, then try again." };
+    if (error?.status === 429) return { error: "Too many attempts. Please wait a minute and try again." };
+    console.error("[admin sign-in]", error?.code, error?.message);
+    return { error: "Sign-in is not available right now. Please try again shortly." };
+  }
 
-  // Only administrators may hold a session in the admin area.
+  // Only administrators may hold a session in the admin area. This message is
+  // shown only after the correct password, so it reveals nothing to strangers.
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).maybeSingle();
   if (profile?.role !== "admin") {
     await supabase.auth.signOut();
-    return { error: "Incorrect email or password." };
+    return { error: "Your password is correct, but this account has not been given admin access. Run: npm run db:admin -- " + parsed.data.email };
   }
   redirect("/admin");
 }

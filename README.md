@@ -60,7 +60,7 @@ npm run db:verify                      # tests the live project and reports what
 
 - All three scripts are **idempotent**. `db:seed` never overwrites anything that already exists, so it is safe to re-run and will not undo edits made in the admin panel.
 - `db:storage` is an alternative to the bucket-creation part of `0002_storage.sql`; running both is fine. The **policies** in `0002_storage.sql` are still required.
-- There is no public admin sign-up. `db:admin` (which needs the secret key) is the only way to grant the admin role. Afterwards, in **Supabase → Authentication → Sign In / Providers**, turn off *Allow new users to sign up*.
+- There is no public admin sign-up. `db:admin` (which needs the secret key) is the only way to grant the admin role. A user created in the Supabase dashboard is **not** an admin until you run `npm run db:admin -- their@email.com`; deleting and re-creating a user removes the role again. To set a new password for an admin, run `npm run db:admin -- their@email.com --reset-password`. Afterwards, in **Supabase → Authentication → Sign In / Providers**, turn off *Allow new users to sign up*.
 
 **Manual bucket creation (only if you cannot run the script):** in Supabase → Storage create four **public** buckets named exactly `product-images`, `homepage-images`, `founder-images`, `collection-images`, each with a 5 MB file size limit and allowed MIME types `image/jpeg, image/png, image/webp, image/avif`. Then run `0002_storage.sql`.
 

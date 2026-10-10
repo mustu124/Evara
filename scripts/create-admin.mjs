@@ -2,7 +2,8 @@
 // There is no public admin sign-up: this script, run with the secret key, is
 // the only way to grant the admin role.
 //
-//   npm run db:admin -- you@example.com
+//   npm run db:admin -- you@example.com                    create or promote
+//   npm run db:admin -- you@example.com --reset-password   also set a new password
 //
 // The password is read from a hidden prompt, or from ADMIN_PASSWORD if set.
 import { createInterface } from "node:readline";
@@ -22,7 +23,19 @@ function promptHidden(question) {
   });
 }
 
-const email = (process.argv[2] ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+const args = process.argv.slice(2);
+const resetPassword = args.includes("--reset-password");
+const email = (args.find((a) => !a.startsWith("--")) ?? process.env.ADMIN_EMAIL ?? "").trim().toLowerCase();
+
+async function askPassword() {
+  const password = process.env.ADMIN_PASSWORD ?? (await promptHidden("Choose a password (min 12 characters): "));
+  if (password.length < 12) fail("The password must be at least 12 characters long.");
+  if (!process.env.ADMIN_PASSWORD) {
+    const again = await promptHidden("Repeat the password: ");
+    if (again !== password) fail("The passwords did not match.");
+  }
+  return password;
+}
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
   fail("Provide the administrator's email address:\n  npm run db:admin -- you@example.com");
 }
@@ -42,15 +55,14 @@ async function findUser(address) {
 
 let user = await findUser(email);
 
-if (user) {
+if (user && resetPassword) {
+  const { error } = await supabase.auth.admin.updateUserById(user.id, { password: await askPassword(), email_confirm: true });
+  if (error) fail(`Could not set the new password: ${error.message}`);
+  ok(`Password updated for ${email}.`);
+} else if (user) {
   ok(`User ${email} already exists; promoting to administrator (password unchanged).`);
 } else {
-  const password = process.env.ADMIN_PASSWORD ?? (await promptHidden("Choose a password (min 12 characters): "));
-  if (password.length < 12) fail("The password must be at least 12 characters long.");
-  if (!process.env.ADMIN_PASSWORD) {
-    const again = await promptHidden("Repeat the password: ");
-    if (again !== password) fail("The passwords did not match.");
-  }
+  const password = await askPassword();
   const { data, error } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (error) fail(`Could not create the user: ${error.message}`);
   user = data.user;
