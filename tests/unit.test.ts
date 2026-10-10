@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatINR, productAvailability, slugify, startingPrice } from "@/lib/format";
+import { formatINR, groupByCandle, productAvailability, slugify, startingPrice } from "@/lib/format";
+import { buildInvoice, gstSplit, isValidGstin } from "@/lib/gst";
 import { normalizeSettings } from "@/lib/data/settings";
 import { customerSchema, normalizeIndianMobile, orderRequestSchema, productSchema } from "@/lib/validation";
 import { buildOrderMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
@@ -8,6 +9,7 @@ const customer = {
   name: "Asha Rao",
   phone: "+91 98765 43210",
   email: "",
+  gstin: "",
   address_line1: "12 Lake View Road",
   address_line2: "",
   city: "Pune",
@@ -72,7 +74,7 @@ describe("customer validation", () => {
   });
 
   it("rejects orders that fill the honeypot, have no items, or carry bad quantities", () => {
-    const item = { variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", option_value_ids: [], quantity: 1 };
+    const item = { variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", units: [[]], quantity: 1 };
     expect(orderRequestSchema.safeParse({ customer, items: [item] }).success).toBe(true);
     expect(orderRequestSchema.safeParse({ customer, items: [] }).success).toBe(false);
     expect(orderRequestSchema.safeParse({ customer, items: [{ ...item, quantity: 0 }] }).success).toBe(false);
@@ -84,16 +86,16 @@ describe("customer validation", () => {
   it("strips any price a browser tries to send with a cart item", () => {
     const parsed = orderRequestSchema.parse({
       customer,
-      items: [{ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", option_value_ids: [], quantity: 2, price: 1, unit_price: 1 }],
+      items: [{ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", units: [[]], quantity: 2, price: 1, unit_price: 1 }],
     });
-    expect(parsed.items[0]).toEqual({ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", option_value_ids: [], quantity: 2 });
+    expect(parsed.items[0]).toEqual({ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", units: [[]], quantity: 2 });
   });
 });
 
 describe("admin product validation", () => {
   const product = {
     name: "Test Candle", slug: "test-candle", description: "", category_id: "", status: "draft", is_coming_soon: false,
-    is_bestseller: false, sort_order: 0, track_inventory: false, stock_quantity: 0, low_stock_threshold: 5,
+    is_bestseller: false, on_sale: false, gst_rate: "", sort_order: 0, track_inventory: false, stock_quantity: 0, low_stock_threshold: 5,
     collection_ids: [], specifications: [], options: [],
     variants: [{ label: "Single Piece", pack_quantity: 1, price: 299, compare_at_price: 350, is_available: true, is_coming_soon: false }],
   };
@@ -114,8 +116,8 @@ describe("WhatsApp ordering", () => {
     reference: "EV-261010-AB2CD",
     customer: { ...customer, phone: "+91 9876543210", note: "Gift wrap please" },
     items: [
-      { product_name: "Daisy Bowl Jar Candle", variant_label: "Set of 2", selected_options: [{ name: "Hue", value: "Blush Pink" }, { name: "Scent", value: "Bamboo & White Tea" }], unit_price: 579, quantity: 1, line_total: 579 },
-      { product_name: "Fruit Shot Glass Candle", variant_label: "Single Piece", selected_options: [{ name: "Design", value: "Mango" }], unit_price: 150, quantity: 3, line_total: 450 },
+      { product_name: "Daisy Bowl Jar Candle", variant_label: "Set of 2", pack_quantity: 2, selected_options: [{ unit: 1, name: "Hue", value: "Blush Pink" }, { unit: 1, name: "Scent", value: "Bamboo & White Tea" }, { unit: 2, name: "Hue", value: "Lilac Mist" }, { unit: 2, name: "Scent", value: "Lavender" }], unit_price: 579, quantity: 1, line_total: 579 },
+      { product_name: "Fruit Shot Glass Candle", variant_label: "Single Piece", pack_quantity: 1, selected_options: [{ unit: 1, name: "Design", value: "Mango" }], unit_price: 150, quantity: 3, line_total: 450 },
     ],
     subtotal: 1029,
     shipping_amount: 0,
@@ -125,17 +127,30 @@ describe("WhatsApp ordering", () => {
   it("includes every required detail in the message", () => {
     const message = buildOrderMessage(order);
     for (const expected of [
-      "EV-261010-AB2CD", "Asha Rao", "+91 9876543210", "Daisy Bowl Jar Candle", "Pack size: Set of 2", "Hue: Blush Pink",
-      "Scent: Bamboo & White Tea", "Design: Mango", "Qty: 3 x ₹150 = ₹450", "Subtotal: ₹1,029", "Total: ₹1,029",
+      "EV-261010-AB2CD", "Asha Rao", "+91 9876543210", "Daisy Bowl Jar Candle", "Pack size: Set of 2",
+      "Candle 1: Hue Blush Pink, Scent Bamboo & White Tea", "Candle 2: Hue Lilac Mist, Scent Lavender", "Design: Mango", "Qty: 3 x ₹150 = ₹450", "Subtotal: ₹1,029", "Total: ₹1,029",
       "12 Lake View Road", "Pune, Maharashtra - 411001", "Gift wrap please",
     ]) {
       expect(message).toContain(expected);
     }
   });
 
-  it("shows a shipping line only when shipping is charged", () => {
+  it("shows the shipping charge as its own line", () => {
     expect(buildOrderMessage(order)).not.toContain("Shipping: ₹");
-    expect(buildOrderMessage({ ...order, shipping_amount: 80, total: 1109 })).toContain("Shipping: ₹80");
+    const withShipping = buildOrderMessage({ ...order, shipping_amount: 100, total: 1129 });
+    expect(withShipping).toContain("Shipping: ₹100");
+    expect(withShipping).toContain("Total: ₹1,129");
+    expect(withShipping.match(/Shipping: /g)).toHaveLength(1);
+  });
+
+  it("includes the GST breakdown and an optional GSTIN", () => {
+    const intra = buildOrderMessage({ ...order, customer: { ...order.customer, gstin: "27AAPFU0939F1ZV" }, tax: { intra_state: true, rate: 5, taxable_value: 980, cgst: 24.5, sgst: 24.5, igst: 0 } });
+    for (const expected of ["GSTIN: 27AAPFU0939F1ZV", "Taxable value: ₹980", "CGST @ 2.5%: ₹24.5", "SGST @ 2.5%: ₹24.5"]) expect(intra).toContain(expected);
+    expect(intra).not.toContain("IGST");
+    const inter = buildOrderMessage({ ...order, tax: { intra_state: false, rate: 5, taxable_value: 980, cgst: 0, sgst: 0, igst: 49 } });
+    expect(inter).toContain("IGST @ 5%: ₹49");
+    expect(inter).not.toContain("CGST");
+    expect(inter).not.toContain("GSTIN");
   });
 
   it("builds a correctly encoded wa.me link", () => {
@@ -164,5 +179,63 @@ describe("settings", () => {
     const s = normalizeSettings([{ key: "store", value: { whatsapp_number: "+91 98765 43210", shipping_fee: "80" } }]);
     expect(s.store.whatsapp_number).toBe("919876543210");
     expect(s.store.shipping_fee).toBe(80);
+  });
+});
+
+describe("GST on GST-inclusive prices", () => {
+  it("matches the brief's intra-state example: ₹150 within Maharashtra", () => {
+    expect(gstSplit(150, 5, true)).toEqual({ taxable: 142.86, cgst: 3.57, sgst: 3.57, igst: 0 });
+  });
+  it("matches the brief's inter-state example: ₹150 to Punjab", () => {
+    expect(gstSplit(150, 5, false)).toEqual({ taxable: 142.86, cgst: 0, sgst: 0, igst: 7.14 });
+  });
+  it("always adds back up to the price, so GST is never charged on top", () => {
+    for (const amount of [1, 99.99, 150, 285, 299, 555, 579, 810, 1080, 12345.67]) {
+      for (const rate of [0, 5, 12, 18, 28]) {
+        for (const intra of [true, false]) {
+          const s = gstSplit(amount, rate, intra);
+          expect(Number((s.taxable + s.cgst + s.sgst + s.igst).toFixed(2))).toBe(amount);
+          expect(s.cgst).toBe(s.sgst);
+        }
+      }
+    }
+  });
+  it("decides CGST+SGST or IGST from the seller's and the customer's state", () => {
+    const amounts = [{ amount: 150, rate: 5 }, { amount: 100, rate: 5 }];
+    const home = buildInvoice(amounts, "Maharashtra", "Maharashtra");
+    expect(home).toMatchObject({ intraState: true, taxable: 238.1, cgst: 5.95, sgst: 5.95, igst: 0, total: 250, rate: 5 });
+    const away = buildInvoice(amounts, "Punjab", "Maharashtra");
+    expect(away).toMatchObject({ intraState: false, taxable: 238.1, cgst: 0, sgst: 0, igst: 11.9, total: 250 });
+    expect(buildInvoice([{ amount: 150, rate: 5 }, { amount: 150, rate: 12 }], "Goa", "Maharashtra").rate).toBeNull();
+  });
+  it("validates a GSTIN only by its format and check character", () => {
+    expect(isValidGstin("27AAPFU0939F1ZV")).toBe(true);
+    expect(isValidGstin(" 27aapfu0939f1zv ")).toBe(true);
+    expect(isValidGstin("27AAPFU0939F1ZX")).toBe(false); // wrong check character
+    expect(isValidGstin("99AAPFU0939F1ZV")).toBe(false); // no such state code
+    expect(isValidGstin("27AAPFU0939F1Z")).toBe(false);
+    expect(isValidGstin("")).toBe(false);
+  });
+  it("leaves the GSTIN optional at checkout but rejects a wrong one", () => {
+    expect(customerSchema.safeParse({ ...customer, gstin: "" }).success).toBe(true);
+    expect(customerSchema.safeParse({ ...customer, gstin: "27AAPFU0939F1ZV" }).success).toBe(true);
+    expect(customerSchema.safeParse({ ...customer, gstin: "ABC" }).success).toBe(false);
+  });
+});
+
+describe("per-candle choices", () => {
+  it("groups stored choices by candle and still reads older single-candle orders", () => {
+    const set = [{ unit: 1, name: "Hue", value: "A" }, { unit: 2, name: "Hue", value: "B" }, { unit: 1, name: "Scent", value: "X" }, { unit: 2, name: "Scent", value: "Y" }];
+    expect(groupByCandle(set, 2).map((c) => c.map((o) => o.value))).toEqual([["A", "X"], ["B", "Y"]]);
+    expect(groupByCandle([{ name: "Hue", value: "A" }, { name: "Scent", value: "X" }], 2)).toHaveLength(1);
+    expect(groupByCandle([], 1)).toEqual([]);
+  });
+  it("requires one list of choices per candle in the order request", () => {
+    const base = { variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", quantity: 1 };
+    const id = "8f3c1e9a-2b4d-4c6e-8f10-123456789abc";
+    expect(orderRequestSchema.safeParse({ customer, items: [{ ...base, units: [[id], [id]] }] }).success).toBe(true);
+    expect(orderRequestSchema.safeParse({ customer, items: [{ ...base, units: [] }] }).success).toBe(false);
+    expect(orderRequestSchema.safeParse({ customer, items: [{ ...base }] }).success).toBe(false);
+    expect(orderRequestSchema.safeParse({ customer, items: [{ ...base, units: [["nope"]] }] }).success).toBe(false);
   });
 });

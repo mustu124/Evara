@@ -44,6 +44,7 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
 const BACKEND_MESSAGES = {
   unconfigured: "The store is not connected to its database yet. Add the Supabase environment variables to load the catalog.",
   schema_missing: "The store is connected to Supabase, but the database has not been set up yet. Run the SQL migrations and the seed script described in the README.",
+  update_needed: "The database needs an update before the store can show prices and take orders: run supabase/migrations/0003_gst_sets_sale.sql (see the README).",
   unreachable: "We are having trouble loading the catalog right now. Please try again in a moment.",
 } as const;
 

@@ -167,6 +167,7 @@ export function ProductForm({ initial, categories, collections }: Props) {
           <div className="grid content-start">
             <Checkbox label="Coming soon" hint="Shown on the store but cannot be ordered." {...register("is_coming_soon")} />
             <Checkbox label="Bestseller" hint="Featured in the homepage Bestsellers section." {...register("is_bestseller")} />
+            <Checkbox label="Sale badge" hint="Shows a small SALE badge on this product's card and page." {...register("on_sale")} />
           </div>
         </div>
       </Panel>
@@ -276,6 +277,12 @@ export function ProductForm({ initial, categories, collections }: Props) {
               ))}
             </div>
           )}
+        </Panel>
+
+        <Panel title="GST" description="Prices are GST-inclusive. Leave empty to use the store's default rate from Settings.">
+          <label htmlFor="p-gst" className={adminLabel}>GST rate for this product (%)</label>
+          <input id="p-gst" type="number" min={0} max={40} step="0.01" placeholder="Store default" className={`${adminInput} max-w-40`} {...register("gst_rate", { setValueAs: priceOrNull })} />
+          <Err message={errors.gst_rate?.message} />
         </Panel>
 
         <Panel title="Inventory" description="Stock is counted in individual pieces. A set of 2 uses 2 pieces.">

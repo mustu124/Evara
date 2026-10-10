@@ -2,15 +2,18 @@
 
 import { useSyncExternalStore } from "react";
 
+export type CartChoice = { name: string; valueId: string; value: string };
+
 export type CartLine = {
-  /** Variant + chosen option values: different combinations are separate lines. */
+  /** Variant + the choices for every candle: different combinations are separate lines. */
   key: string;
   productId: string;
   slug: string;
   name: string;
   variantId: string;
   variantLabel: string;
-  options: { name: string; valueId: string; value: string }[];
+  /** One list of choices per candle in the pack (a Set of 2 has two lists). */
+  units: CartChoice[][];
   /** Display only. Prices are always re-read from the database on the server. */
   unitPrice: number;
   compareAtPrice: number | null;
@@ -19,14 +22,17 @@ export type CartLine = {
 };
 
 export const MAX_LINE_QUANTITY = 50;
-const STORAGE_KEY = "evara-cart-v1";
+// v2: lines carry per-candle choices. Carts saved in the older shape are dropped.
+const STORAGE_KEY = "evara-cart-v2";
 const EMPTY: CartLine[] = [];
 
 let lines: CartLine[] = EMPTY;
 let loaded = false;
 const listeners = new Set<() => void>();
 
-export const cartKey = (variantId: string, valueIds: string[]) => [variantId, ...[...valueIds].sort()].join(":");
+/** The same candles in a different order are the same set, so candles are sorted before keying. */
+export const cartKey = (variantId: string, unitValueIds: string[][]) =>
+  [variantId, ...unitValueIds.map((ids) => [...ids].sort().join("+")).sort()].join(":");
 
 const clampQty = (n: number) => Math.min(MAX_LINE_QUANTITY, Math.max(1, Math.floor(Number(n) || 1)));
 
@@ -36,8 +42,8 @@ function read(): CartLine[] {
     const parsed: unknown = raw ? JSON.parse(raw) : [];
     if (!Array.isArray(parsed)) return EMPTY;
     return parsed
-      .filter((l): l is CartLine => Boolean(l && typeof l.key === "string" && typeof l.variantId === "string"))
-      .map((l) => ({ ...l, options: Array.isArray(l.options) ? l.options : [], quantity: clampQty(l.quantity) }));
+      .filter((l): l is CartLine => Boolean(l && typeof l.key === "string" && typeof l.variantId === "string" && Array.isArray(l.units)))
+      .map((l) => ({ ...l, units: l.units.map((u) => (Array.isArray(u) ? u : [])), quantity: clampQty(l.quantity) }));
   } catch {
     return EMPTY;
   }

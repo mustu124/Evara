@@ -4,14 +4,16 @@ import { useState } from "react";
 import { saveStoreSettings } from "@/app/admin/actions/content";
 import { adminInput, adminLabel, btnPrimary, Notice, Panel, Spinner, useAction } from "@/components/admin/ui";
 import type { StoreSettings } from "@/lib/types";
+import { INDIAN_STATES } from "@/lib/validation";
 
-type Draft = Omit<StoreSettings, "shipping_fee" | "free_shipping_above"> & { shipping_fee: string; free_shipping_above: string };
+type Draft = Omit<StoreSettings, "shipping_fee" | "free_shipping_above" | "default_gst_rate"> & { shipping_fee: string; free_shipping_above: string; default_gst_rate: string };
 
 export function SettingsForm({ initial, envFallback }: { initial: StoreSettings; envFallback: boolean }) {
   const [draft, setDraft] = useState<Draft>({
     ...initial,
     shipping_fee: String(initial.shipping_fee ?? 0),
     free_shipping_above: initial.free_shipping_above === null ? "" : String(initial.free_shipping_above),
+    default_gst_rate: String(initial.default_gst_rate ?? 5),
   });
   const { run, pending, result } = useAction();
   const bind = (key: keyof Draft) => ({
@@ -67,7 +69,26 @@ export function SettingsForm({ initial, envFallback }: { initial: StoreSettings;
         </div>
       </Panel>
 
-      <Panel title="Shipping" description="Leave the fee at 0 to confirm shipping with each customer on WhatsApp instead.">
+      <Panel title="GST" description="Prices on the store already include GST. These settings decide how the tax inside each order is worked out and shown. Confirm the correct rate with your accountant before going live.">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="s-seller_state" className={adminLabel}>State the business is registered in</label>
+            <select id="s-seller_state" value={draft.seller_state} className={adminInput} onChange={(e) => setDraft((d) => ({ ...d, seller_state: e.target.value }))}>
+              {INDIAN_STATES.map((state) => (
+                <option key={state} value={state}>{state}</option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-muted">Deliveries within this state show CGST + SGST; other states show IGST.</p>
+          </div>
+          <div>
+            <label htmlFor="s-default_gst_rate" className={adminLabel}>Default GST rate (%)</label>
+            <input type="number" min={0} max={40} step="0.01" required {...bind("default_gst_rate")} />
+            <p className="mt-1 text-xs text-muted">Used for every product that does not set its own rate, and for shipping.</p>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel title="Shipping" description="One flat, GST-inclusive charge added once to every order. Set it to 0 to charge no shipping.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label htmlFor="s-shipping_fee" className={adminLabel}>Flat shipping fee (₹)</label>

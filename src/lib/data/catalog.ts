@@ -16,10 +16,22 @@ import type {
 /* eslint-disable @typescript-eslint/no-explicit-any -- PostgREST rows are mapped to typed shapes below */
 
 const SUMMARY_SELECT = `
-  id, name, slug, is_coming_soon, is_bestseller, track_inventory, stock_quantity, sort_order, created_at,
+  id, name, slug, is_coming_soon, is_bestseller, on_sale, track_inventory, stock_quantity, sort_order, created_at,
   category:categories ( id, name, slug ),
   variants:product_variants ( id, label, pack_quantity, price, compare_at_price, is_available, is_coming_soon, sort_order ),
   images:product_images ( storage_path, alt, sort_order )`;
+
+// Until migration 0003 has been applied the products table has no on_sale /
+// gst_rate columns. Reading still works without them (defaults are used), and
+// the check stops as soon as the columns are seen once.
+let hasSaleAndTaxColumns = false;
+async function modern(db: NonNullable<ReturnType<typeof getPublicClient>>): Promise<boolean> {
+  if (hasSaleAndTaxColumns) return true;
+  const { error } = await db.from("products").select("on_sale").limit(1);
+  hasSaleAndTaxColumns = !error;
+  return hasSaleAndTaxColumns;
+}
+const legacy = (select: string) => select.replace(", on_sale, gst_rate", "").replace(", on_sale", "");
 
 const bySort = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - b.sort_order;
 
@@ -32,6 +44,7 @@ const mapVariant = (v: any): Variant => ({
 function mapSummary(row: any): ProductSummary {
   return {
     ...row,
+    on_sale: Boolean(row.on_sale),
     category: Array.isArray(row.category) ? (row.category[0] ?? null) : (row.category ?? null),
     variants: (row.variants ?? []).map(mapVariant).sort(bySort),
     images: [...(row.images ?? [])].sort(bySort),
@@ -103,7 +116,7 @@ export async function getProducts(query: ProductQuery = {}): Promise<ProductPage
   const db = getPublicClient();
   if (!db) return empty;
 
-  let select = SUMMARY_SELECT;
+  let select = (await modern(db)) ? SUMMARY_SELECT : legacy(SUMMARY_SELECT);
   let collectionId: string | undefined;
   if (query.collectionSlug) {
     collectionId = (await getCollections()).find((c) => c.slug === query.collectionSlug)?.id;
@@ -158,7 +171,7 @@ export async function getBestsellers(limit = 8): Promise<ProductSummary[]> {
   if (!db) return [];
   const { data, error } = await db
     .from("products")
-    .select(SUMMARY_SELECT)
+    .select((await modern(db)) ? SUMMARY_SELECT : legacy(SUMMARY_SELECT))
     .eq("status", "published")
     .eq("is_bestseller", true)
     .order("sort_order")
@@ -170,18 +183,17 @@ export async function getBestsellers(limit = 8): Promise<ProductSummary[]> {
 export const getProductBySlug = cache(async (slug: string): Promise<ProductDetail | null> => {
   const db = getPublicClient();
   if (!db) return null;
-  const { data, error } = await db
-    .from("products")
-    .select(
-      `id, name, slug, description, status, is_coming_soon, is_bestseller, specifications,
+  const detailSelect = `id, name, slug, description, status, is_coming_soon, is_bestseller, on_sale, gst_rate, specifications,
        track_inventory, stock_quantity, low_stock_threshold, sort_order, created_at,
        category:categories ( id, name, slug ),
        variants:product_variants ( id, label, pack_quantity, price, compare_at_price, is_available, is_coming_soon, sort_order ),
        images:product_images ( id, storage_path, alt, option_value_id, show_in_gallery, sort_order ),
        options:product_options ( id, name, kind, sort_order,
          values:product_option_values ( id, value, is_available, is_coming_soon, sort_order ) ),
-       product_collections ( collections ( id, name, slug ) )`,
-    )
+       product_collections ( collections ( id, name, slug ) )`;
+  const { data, error } = await db
+    .from("products")
+    .select((await modern(db)) ? detailSelect : legacy(detailSelect))
     .eq("slug", slug)
     .eq("status", "published")
     .maybeSingle();
@@ -192,6 +204,8 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
   return {
     ...rest,
     category: Array.isArray(row.category) ? (row.category[0] ?? null) : (row.category ?? null),
+    on_sale: Boolean(row.on_sale),
+    gst_rate: row.gst_rate === null || row.gst_rate === undefined ? null : Number(row.gst_rate),
     specifications: Array.isArray(row.specifications) ? row.specifications : [],
     variants: (row.variants ?? []).map(mapVariant).sort(bySort),
     images: ([...(row.images ?? [])] as ProductImage[]).sort(bySort),
@@ -207,7 +221,7 @@ export async function getRelatedProducts(product: ProductDetail, limit = 4): Pro
   if (!db) return [];
   const { data, error } = await db
     .from("products")
-    .select(SUMMARY_SELECT)
+    .select((await modern(db)) ? SUMMARY_SELECT : legacy(SUMMARY_SELECT))
     .eq("status", "published")
     .neq("id", product.id)
     .order("sort_order")

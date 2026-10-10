@@ -82,8 +82,8 @@ export default async function ProductPage({ params }: Props) {
           />
         </ProductPurchase>
 
-        {(product.specifications.length > 0 || product.collections.length > 0) && (
-          <section className="mx-auto mt-16 max-w-3xl border-t border-line pt-12" aria-labelledby="specs-heading">
+        {(product.specifications.length > 0 || product.collections.length > 0 || product.description) && (
+          <section className="mx-auto mt-12 max-w-3xl border-t border-line pt-10" aria-labelledby="specs-heading">
             <h2 id="specs-heading" className="text-center text-3xl">Product Specifications</h2>
             {product.specifications.length > 0 && (
               <dl className="mt-8 divide-y divide-line border-y border-line">
@@ -94,6 +94,12 @@ export default async function ProductPage({ params }: Props) {
                   </div>
                 ))}
               </dl>
+            )}
+            {product.description && (
+              <div className="mt-10">
+                <h2 className="text-center text-3xl">Description</h2>
+                <p className="mt-5 text-center leading-relaxed text-cocoa/90">{product.description}</p>
+              </div>
             )}
             {product.collections.length > 0 && (
               <p className="mt-6 text-center text-sm text-muted">
@@ -107,7 +113,8 @@ export default async function ProductPage({ params }: Props) {
               </p>
             )}
             <p className="mt-6 text-center text-sm text-muted">
-              Each candle is handcrafted, so small variations in colour and finish are natural.
+              Each candle is handcrafted, so small variations in colour and finish are natural. Prices are inclusive of
+              applicable GST.
             </p>
           </section>
         )}

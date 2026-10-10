@@ -23,10 +23,15 @@ There is no online payment gateway. An order placed on the site is a *pending, u
 
 ### 2.1 Create the database
 
-Apply the two migration files **in order**. Either:
+Apply the three migration files **in order**. Either:
 
-- **SQL Editor (no extra setup):** in the Supabase dashboard open **SQL Editor** and run the full contents of `supabase/migrations/0001_schema.sql` (tables, the order function, all security policies), then `supabase/migrations/0002_storage.sql` (image buckets and their policies); or
+- **SQL Editor (no extra setup):** in the Supabase dashboard open **SQL Editor** and run the full contents of each file in `supabase/migrations/`:
+  1. `0001_schema.sql` — tables, the order function, all security policies
+  2. `0002_storage.sql` — image buckets and their policies
+  3. `0003_gst_sets_sale.sql` — GST, per-candle choices in sets, the sale badge; or
 - **Command line:** add `SUPABASE_DB_URL` to `.env.local` (Supabase -> **Connect** -> *Session pooler* URI, with your database password) and run `npm run db:migrate`. It applies each file in a transaction, records what it applied, and is safe to re-run.
+
+If the site shows "The database needs an update", migration 0003 has not been run yet.
 
 ### 2.2 Configure environment variables
 
@@ -121,6 +126,8 @@ All catalog content, prices, stock and site settings come from Supabase. Public 
 - **`product_variants`** are the price-bearing pack sizes (Single Piece, Set of 2, …), each with its own price, original price and availability.
 - **`product_options` / `product_option_values`** are the non-price choices (Design, Hue, Scent). Each value can be marked unavailable or *coming soon*; such values are shown but cannot be selected or ordered.
 - A customer picks one pack size plus one value for every option. Each distinct combination is its own cart line.
+- **Sets:** a pack of N candles carries N sets of choices, one per candle, so a Set of 4 can be four different designs, hues and scents. Each candle's choices are stored with the order line.
+- **Sale badge:** `products.on_sale`, switched per product in the admin. Nothing shows the badge unless an administrator turns it on.
 - **Inventory** is optional per product and counted in individual pieces (a Set of 2 uses 2). The seed leaves tracking off because no stock figures were supplied.
 
 ### Ordering and WhatsApp
@@ -134,6 +141,20 @@ All catalog content, prices, stock and site settings come from Supabase. Public 
 Opening WhatsApp never changes the order. It stays **Pending / Unpaid** until an administrator updates it.
 
 Stock is deducted when an order moves to *Confirmed* (or later) and returned if a confirmed order is cancelled.
+
+### GST and shipping
+
+- **Prices are GST-inclusive.** Tax is extracted from the price, never added on top, so the amount a customer pays does not depend on their state.
+- **Rate:** a store default (Admin -> Settings, seeded as 5%) that any product can override (Admin -> Products -> GST). Nothing is hardcoded. **Confirm the correct rate for your products with an accountant before going live.**
+- **Tax type:** the delivery state is compared with the seller's state (Admin -> Settings, seeded as Maharashtra). Same state: CGST + SGST. Any other state: IGST.
+- **Arithmetic:** for each line, `tax = amount - amount / (1 + rate)`. Within the state, `CGST = SGST = round(tax / 2)` and `taxable = amount - CGST - SGST`; otherwise `IGST = round(tax)` and `taxable = amount - IGST`. The parts therefore always add back to the amount exactly.
+  - ₹150 within Maharashtra at 5%: taxable ₹142.86, CGST ₹3.57, SGST ₹3.57, total ₹150.00.
+  - ₹150 to Punjab at 5%: taxable ₹142.86, IGST ₹7.14, total ₹150.00.
+  - The brief's examples show a taxable value of ₹142.85. That figure plus the tax comes to ₹149.99, so the site uses ₹142.86 to make the invoice add up to the ₹150 charged.
+- **Shipping:** one flat, GST-inclusive charge per order (Admin -> Settings, seeded as ₹100), added once however many items or quantities the order holds. It is taxed at the highest GST rate among the items in the order.
+- **GSTIN:** optional at checkout. If entered it is checked for format and its check character, stored with the order and included in the WhatsApp message.
+- **Stored with every order:** tax type, seller state, taxable value, CGST, SGST, IGST, the shipping tax rate, and per line the rate, taxable value and tax. The cart, the confirmation screen, the WhatsApp message and the admin order page all show these same stored figures.
+- There is no PDF tax invoice. The admin order page shows the breakdown needed to raise one.
 
 ### Admin panel (`/admin`)
 
@@ -155,7 +176,7 @@ Overview · Orders · Products (details, pack sizes, options, specifications, im
 ```bash
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
-npm test            # 43 automated tests
+npm test            # 63 automated tests
 npm run build       # production build
 ```
 
@@ -167,14 +188,16 @@ npm run build       # production build
 - option selections are validated; historical prices survive later price changes;
 - rate limiting works; stock is deducted on confirmation and restored on cancellation;
 - anonymous and ordinary signed-in users cannot read orders, change the catalog, promote themselves or call `create_order()`, while administrators can do their job;
+- each candle in a set keeps its own choices, and a set with any candle incomplete or unavailable is refused;
+- GST is extracted from the price and always adds back to it, for both the intra-state and inter-state examples in the brief; shipping is charged once; rates are configurable; the GSTIN is optional;
 - the WhatsApp message contains every required detail and is correctly URL-encoded.
 
 ### Manual checklist against your real Supabase project
 
 1. Home, Shop, a product page and a category page show the seeded products and photos.
-2. On *Daisy Bowl Jar Candle*, switching to **Set of 2** changes the price from ₹299 to ₹579.
+2. On *Daisy Bowl Jar Candle*, switching to **Set of 2** changes the price from ₹299 to ₹579 and shows **Candle 1** and **Candle 2**, each with its own hue and scent.
 3. On *Fruit Shot Glass Candle*, **Orange** and **Green Apple** are labelled coming soon and cannot be selected.
-4. Add two different hue/scent combinations: the cart shows two lines; refresh keeps them.
+4. Add two different hue/scent combinations: the cart shows two lines; refresh keeps them. The summary shows Shipping ₹100 once, and choosing the delivery state shows CGST + SGST (Maharashtra) or IGST (elsewhere).
 5. Clear the WhatsApp number in Admin → Settings: the cart explains that ordering is unavailable. Set it again and reload.
 6. Complete checkout: you see an order reference, WhatsApp opens with the full message, and the order appears in Admin → Orders as **Pending / Unpaid**.
 7. In the admin, change a price and confirm the storefront updates; upload, reorder, replace and delete a product image; mark an order Confirmed and Paid.
@@ -191,8 +214,8 @@ Last audited on 10 October 2026 against a local **production build** (`next buil
 | Area | What was run | Result |
 | --- | --- | --- |
 | Build | `npm run build`, `npm run typecheck`, `npm run lint` | Pass, no warnings |
-| Automated tests | `npm test` (database logic, access policies, validation, WhatsApp message) | 43 of 43 pass |
-| Supabase connectivity, schema, policies | `npm run db:verify` against the live project | 45 of 45 pass |
+| Automated tests | `npm test` (database logic, access policies, validation, GST, WhatsApp message) | 63 of 63 pass |
+| Supabase connectivity, schema, policies, GST and per-candle orders | `npm run db:verify` against the live project | 53 of 53 pass |
 | Public routes and navigation | Browser crawl of the production build | 53 internal URLs return 200; all 37 required routes exist and are linked; unknown URLs return a real 404 |
 | Product information and image mapping | Every product page compared with the brief | Name, description, every pack price and original price, every option value, coming-soon values disabled, specifications, photo count, and the right photo per option, for all 5 products |
 | Product navigation | Clicking each product photo and card | Opens the matching product |
@@ -206,6 +229,7 @@ Last audited on 10 October 2026 against a local **production build** (`next buil
 | Product CRUD, inventory, storage uploads | Same test | Create, edit, publish, unpublish, archive, delete; pack sizes, options, specifications; image upload, reorder, replace, delete (files removed from storage; fake images rejected); stock tracking enforced on orders |
 | Order status management | Same test | Search, filters, details, status and payment updates, cancel confirmation, revenue counted only when paid |
 | Cache refresh after admin edits | Same test, on the cached production build | A newly published product, a price change, an unpublish, new categories and settings changes each appeared on the storefront immediately |
+| Product page, sets, GST, shipping, GSTIN, sale badge (11 October 2026) | Browser test on the production build against the live database (59 checks) | Gallery arrows; description below specifications; Colour, Scent, Pack size, Quantity order; one set of choices per candle; shipping charged once; CGST + SGST or IGST by state; optional GSTIN; sale badge only where enabled; larger uncropped founders' photos; Instagram card when configured |
 | Secrets | Scan of the production browser bundle and of every committed file | The secret key is in neither; `.env.local` and the brief folder are git-ignored |
 | Dependencies | `npm audit --omit=dev` | 0 known vulnerabilities in what is deployed |
 
@@ -213,7 +237,7 @@ All test accounts, products, images and orders created by these tests were remov
 
 ### Completed in the live Supabase project
 
-- Migrations applied; four public storage buckets created with size and type limits; catalog seeded (16 categories, 6 collections, 5 products, 16 pack sizes, 48 option values, 19 product photos).
+- All three migrations applied; shipping ₹100, seller state Maharashtra and default GST 5% set; four public storage buckets created with size and type limits; catalog seeded (16 categories, 6 collections, 5 products, 16 pack sizes, 48 option values, 19 product photos).
 - WhatsApp number set to 918369440340.
 - One administrator account exists and has signed in successfully.
 
@@ -241,7 +265,8 @@ All test accounts, products, images and orders created by these tests were remov
 - **Collection and category photos** reuse the supplied candle photos as stand-ins. Eight of the nine main category cards have no photo. Replace or add them in Admin → Collections and Admin → Categories.
 - **Collections are empty:** no products are assigned to any collection yet.
 - **Founders' names** (Neehal, Tanishq) were taken from the photo file names.
-- **Email and Instagram** were not supplied and are blank, so they are hidden on the site.
+- **Email and Instagram** were not supplied and are blank, so they are hidden on the site. Add the Instagram link in Admin -> Settings and the Contact page and footer show it.
+- **GST rate:** 5% is the rate used in the brief's examples. Confirm it before going live.
 - **Customer reviews:** none were supplied, so the section is hidden until genuine reviews are added in Admin → Homepage.
 - **Hero photos** are portrait and 900 px wide, so they look soft in the full-width banner on large screens. Landscape photos of at least 1920 px will look sharper.
 - **Development tooling** (the test runner and linter, not deployed) has open advisories reported by `npm audit`. They are pinned because newer versions need a newer Node.js than 22.12.

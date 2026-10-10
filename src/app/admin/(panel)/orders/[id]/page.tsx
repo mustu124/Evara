@@ -7,7 +7,8 @@ import { OrderEditor } from "@/components/admin/order-editor";
 import { btnSecondary, Panel } from "@/components/admin/ui";
 import { WhatsAppIcon } from "@/components/icons";
 import { requireAdmin } from "@/lib/auth";
-import { formatDate, formatINR, imageUrl } from "@/lib/format";
+import { formatDate, formatINR, formatINRExact, groupByCandle, imageUrl } from "@/lib/format";
+import { formatRate } from "@/lib/gst";
 import type { Order, OrderItem } from "@/lib/types";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -44,9 +45,19 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
                       <p className="font-medium text-cocoa">{item.product_name}</p>
                       <dl className="mt-0.5 text-sm text-muted">
                         <div className="flex gap-1.5"><dt>Pack size:</dt><dd className="text-cocoa">{item.variant_label}</dd></div>
-                        {item.selected_options.map((o) => (
-                          <div key={o.name} className="flex gap-1.5"><dt>{o.name}:</dt><dd className="text-cocoa">{o.value}</dd></div>
-                        ))}
+                        {groupByCandle(item.selected_options, item.pack_quantity).length <= 1
+                          ? item.selected_options.map((o) => (
+                              <div key={o.name} className="flex gap-1.5"><dt>{o.name}:</dt><dd className="text-cocoa">{o.value}</dd></div>
+                            ))
+                          : groupByCandle(item.selected_options, item.pack_quantity).map((choices, n) => (
+                              <div key={n} className="flex gap-1.5">
+                                <dt className="shrink-0">Candle {n + 1}:</dt>
+                                <dd className="text-cocoa">{choices.map((o) => `${o.name} ${o.value}`).join(", ")}</dd>
+                              </div>
+                            ))}
+                        {item.gst_rate !== undefined && Number(item.taxable_value) > 0 && (
+                          <div className="flex gap-1.5"><dt>GST {formatRate(Number(item.gst_rate))}%:</dt><dd>{formatINRExact(Number(item.tax_amount))} in {formatINRExact(Number(item.line_total))}</dd></div>
+                        )}
                       </dl>
                     </div>
                     <div className="shrink-0 text-right text-sm">
@@ -62,7 +73,27 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
               <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd>{Number(order.shipping_amount) > 0 ? formatINR(Number(order.shipping_amount)) : "Not charged"}</dd></div>
               <div className="flex justify-between text-base font-semibold text-cocoa"><dt>Total</dt><dd>{formatINR(Number(order.total))}</dd></div>
             </dl>
-            <p className="mt-3 text-xs text-muted">Prices are as they were when the order was placed.</p>
+            {order.tax_type ? (
+              <dl className="mt-4 space-y-1 rounded-lg border border-line bg-canvas p-3.5 text-sm">
+                <div className="flex justify-between font-medium text-cocoa">
+                  <dt>GST included in the total</dt>
+                  <dd>{order.tax_type === "intra_state" ? `Within ${order.seller_state}` : `Inter-state (from ${order.seller_state})`}</dd>
+                </div>
+                <div className="flex justify-between"><dt className="text-muted">Taxable value</dt><dd className="tabular-nums">{formatINRExact(Number(order.taxable_value))}</dd></div>
+                {order.tax_type === "intra_state" ? (
+                  <>
+                    <div className="flex justify-between"><dt className="text-muted">CGST</dt><dd className="tabular-nums">{formatINRExact(Number(order.cgst_amount))}</dd></div>
+                    <div className="flex justify-between"><dt className="text-muted">SGST</dt><dd className="tabular-nums">{formatINRExact(Number(order.sgst_amount))}</dd></div>
+                  </>
+                ) : (
+                  <div className="flex justify-between"><dt className="text-muted">IGST</dt><dd className="tabular-nums">{formatINRExact(Number(order.igst_amount))}</dd></div>
+                )}
+                <div className="flex justify-between border-t border-line pt-1 font-medium text-cocoa"><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(Number(order.total))}</dd></div>
+              </dl>
+            ) : (
+              <p className="mt-4 text-xs text-muted">This order was placed before GST details were recorded.</p>
+            )}
+            <p className="mt-3 text-xs text-muted">Prices and tax are as they were when the order was placed.</p>
           </Panel>
 
           <OrderEditor id={order.id} status={order.status} paymentStatus={order.payment_status} adminNote={order.admin_note ?? ""} />
@@ -78,6 +109,12 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
               <dt className="text-xs font-medium uppercase tracking-wider text-muted">Phone</dt>
               <dd className="mt-0.5"><a href={`tel:+91${order.customer_phone}`} className="text-copper-dark underline underline-offset-4">+91 {order.customer_phone}</a></dd>
             </div>
+            {order.customer_gstin && (
+              <div>
+                <dt className="text-xs font-medium uppercase tracking-wider text-muted">GSTIN</dt>
+                <dd className="mt-0.5 font-mono">{order.customer_gstin}</dd>
+              </div>
+            )}
             {order.customer_email && (
               <div>
                 <dt className="text-xs font-medium uppercase tracking-wider text-muted">Email</dt>

@@ -84,21 +84,25 @@ async function createOrder(items: unknown[], opts: { phone?: string; hash?: stri
   });
 }
 
+const PACK: Record<string, number> = { "Single Piece": 1, "Set of 2": 2, "Set of 4": 4, "Set of 6": 6 };
+/** The same choices for every candle in the pack. */
+const forEachCandle = (ids: string[], pack: string) => Array.from({ length: PACK[pack] }, () => ids);
+
 const daisy = (qty = 1, pack = "Single Piece") => ({
   variant_id: variant("Daisy Bowl Jar Candle", pack),
-  option_value_ids: [value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Daisy Bowl Jar Candle", "Scent", "Jasmine")],
+  units: forEachCandle([value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Daisy Bowl Jar Candle", "Scent", "Jasmine")], pack),
   quantity: qty,
 });
 const fruit = (design: string, qty = 1, pack = "Single Piece") => ({
   variant_id: variant("Fruit Shot Glass Candle", pack),
-  option_value_ids: [value("Fruit Shot Glass Candle", "Design", design)],
+  units: forEachCandle([value("Fruit Shot Glass Candle", "Design", design)], pack),
   quantity: qty,
 });
 
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUBS);
-  for (const file of ["0001_schema.sql", "0002_storage.sql"]) {
+  for (const file of ["0001_schema.sql", "0002_storage.sql", "0003_gst_sets_sale.sql"]) {
     await db.exec(readFileSync(join(__dirname, "..", "supabase", "migrations", file), "utf8"));
   }
 
@@ -196,7 +200,10 @@ describe("create_order", () => {
     expect(items).toHaveLength(2);
     expect(items[0]).toMatchObject({ product_name: "Daisy Bowl Jar Candle", variant_label: "Set of 2", quantity: 1 });
     expect(Number(items[0].unit_price)).toBe(579);
-    expect(items[0].selected_options).toEqual([{ name: "Hue", value: "Blush Pink" }, { name: "Scent", value: "Jasmine" }]);
+    expect(items[0].selected_options).toEqual([
+      { unit: 1, name: "Hue", value: "Blush Pink" }, { unit: 1, name: "Scent", value: "Jasmine" },
+      { unit: 2, name: "Hue", value: "Blush Pink" }, { unit: 2, name: "Scent", value: "Jasmine" },
+    ]);
     expect(Number(items[1].line_total)).toBe(450);
   });
 
@@ -214,13 +221,13 @@ describe("create_order", () => {
   });
 
   it("requires exactly one valid value for every option", async () => {
-    const missing = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), option_value_ids: [value("Daisy Bowl Jar Candle", "Hue", "Blush Pink")], quantity: 1 }]);
+    const missing = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), units: [[value("Daisy Bowl Jar Candle", "Hue", "Blush Pink")]], quantity: 1 }]);
     expect(missing.errors![0].code).toBe("invalid_options");
 
-    const twoHues = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), option_value_ids: [value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Daisy Bowl Jar Candle", "Hue", "Powder Blue")], quantity: 1 }]);
+    const twoHues = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), units: [[value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Daisy Bowl Jar Candle", "Hue", "Powder Blue")]], quantity: 1 }]);
     expect(twoHues.errors![0].code).toBe("invalid_options");
 
-    const foreign = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), option_value_ids: [value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Fruit Shot Glass Candle", "Design", "Mango")], quantity: 1 }]);
+    const foreign = await createOrder([{ variant_id: variant("Daisy Bowl Jar Candle", "Single Piece"), units: [[value("Daisy Bowl Jar Candle", "Hue", "Blush Pink"), value("Fruit Shot Glass Candle", "Design", "Mango")]], quantity: 1 }]);
     expect(foreign.errors![0].code).toBe("invalid_options");
   });
 
@@ -228,8 +235,8 @@ describe("create_order", () => {
     const [{ count: before }] = await q<{ count: number }>("select count(*)::int as count from public.orders");
     expect((await createOrder([daisy(0)])).errors![0].code).toBe("invalid");
     expect((await createOrder([daisy(51)])).errors![0].code).toBe("invalid");
-    expect((await createOrder([{ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", option_value_ids: [], quantity: 1 }])).errors![0].code).toBe("not_found");
-    expect((await createOrder([{ variant_id: "not-a-uuid", option_value_ids: [], quantity: 1 }])).errors![0].code).toBe("invalid");
+    expect((await createOrder([{ variant_id: "7f3c1e9a-2b4d-4c6e-8f10-123456789abc", units: [[]], quantity: 1 }])).errors![0].code).toBe("not_found");
+    expect((await createOrder([{ variant_id: "not-a-uuid", units: [[]], quantity: 1 }])).errors![0].code).toBe("invalid");
     expect((await createOrder([])).code).toBe("invalid_cart");
     // One bad line blocks the whole order.
     expect((await createOrder([daisy(1), fruit("Green Apple")])).ok).toBe(false);
@@ -238,7 +245,7 @@ describe("create_order", () => {
   });
 
   it("refuses unpublished, coming-soon and unavailable products", async () => {
-    const velvet = { variant_id: variant("Velvet Shot Glass Candle", "Single Piece"), option_value_ids: [value("Velvet Shot Glass Candle", "Design", "Coffee Latte")], quantity: 1 };
+    const velvet = { variant_id: variant("Velvet Shot Glass Candle", "Single Piece"), units: [[value("Velvet Shot Glass Candle", "Design", "Coffee Latte")]], quantity: 1 };
     const productId = ids.product.get("Velvet Shot Glass Candle");
 
     await db.query("update public.products set status = 'draft' where id = $1", [productId]);
@@ -293,10 +300,158 @@ describe("create_order", () => {
   });
 });
 
+describe("sets: every candle has its own choices", () => {
+  const D = "Daisy Bowl Jar Candle";
+  const pick = (hue: string, scent: string) => [value(D, "Hue", hue), value(D, "Scent", scent)];
+
+  it("stores a different hue and scent for each candle in a set", async () => {
+    const result = await createOrder([{ variant_id: variant(D, "Set of 2"), units: [pick("Blush Pink", "Jasmine"), pick("Lilac Mist", "Lavender")], quantity: 1 }]);
+    expect(result.ok).toBe(true);
+    const [item] = await q<{ selected_options: unknown; pack_quantity: number; line_total: string }>("select selected_options, pack_quantity, line_total from public.order_items where order_id = $1", [result.order!.id]);
+    expect(item.pack_quantity).toBe(2);
+    expect(Number(item.line_total)).toBe(579);
+    expect(item.selected_options).toEqual([
+      { unit: 1, name: "Hue", value: "Blush Pink" }, { unit: 1, name: "Scent", value: "Jasmine" },
+      { unit: 2, name: "Hue", value: "Lilac Mist" }, { unit: 2, name: "Scent", value: "Lavender" },
+    ]);
+  });
+
+  it("needs exactly one complete set of choices per candle", async () => {
+    const tooFew = await createOrder([{ variant_id: variant(D, "Set of 2"), units: [pick("Blush Pink", "Jasmine")], quantity: 1 }]);
+    expect(tooFew.errors![0].code).toBe("invalid_options");
+    const tooMany = await createOrder([{ variant_id: variant(D, "Single Piece"), units: [pick("Blush Pink", "Jasmine"), pick("Lilac Mist", "Lavender")], quantity: 1 }]);
+    expect(tooMany.errors![0].code).toBe("invalid_options");
+    const secondIncomplete = await createOrder([{ variant_id: variant(D, "Set of 2"), units: [pick("Blush Pink", "Jasmine"), [value(D, "Hue", "Lilac Mist")]], quantity: 1 }]);
+    expect(secondIncomplete.errors![0]).toMatchObject({ code: "invalid_options" });
+    expect(secondIncomplete.errors![0].message).toContain("candle 2");
+    const noUnits = await createOrder([{ variant_id: variant(D, "Set of 2"), quantity: 1 }]);
+    expect(noUnits.errors![0].code).toBe("invalid_options");
+  });
+
+  it("refuses a set when any one candle uses a coming-soon value", async () => {
+    const F = "Fruit Shot Glass Candle";
+    const d = (name: string) => [value(F, "Design", name)];
+    const result = await createOrder([{ variant_id: variant(F, "Set of 4"), units: [d("Mango"), d("Blueberry"), d("Orange"), d("Strawberry")], quantity: 1 }]);
+    expect(result.errors![0]).toMatchObject({ code: "unavailable" });
+    expect(result.errors![0].message).toContain("Orange");
+    expect((await createOrder([{ variant_id: variant(F, "Set of 4"), units: [d("Mango"), d("Blueberry"), d("Raspberry"), d("Strawberry")], quantity: 2 }])).ok).toBe(true);
+  });
+});
+
+describe("GST (prices are GST-inclusive)", () => {
+  const tax = async (id: string) => (await q<Record<string, string>>("select tax_type, seller_state, taxable_value, cgst_amount, sgst_amount, igst_amount, shipping_amount, shipping_taxable_value, shipping_gst_rate, total, customer_gstin from public.orders where id = $1", [id]))[0];
+  const place = (items: unknown[], over: Record<string, string>) =>
+    as("service_role", null, async () => (await q<{ result: OrderResult }>("select public.create_order($1::jsonb, $2::jsonb, null) as result", [JSON.stringify(customer({ phone: String(++phoneCounter), ...over })), JSON.stringify(items)]))[0].result);
+
+  it("extracts tax from the price: the ₹150 candle within Maharashtra is CGST + SGST", async () => {
+    const result = await place([fruit("Mango")], { state: "Maharashtra" });
+    const t = await tax(result.order!.id);
+    expect(t.tax_type).toBe("intra_state");
+    expect([Number(t.cgst_amount), Number(t.sgst_amount), Number(t.igst_amount)]).toEqual([3.57, 3.57, 0]);
+    expect(Number(t.taxable_value)).toBe(142.86);
+    expect(Number(t.total)).toBe(150);
+    expect(Number(t.taxable_value) + Number(t.cgst_amount) + Number(t.sgst_amount)).toBeCloseTo(150, 2);
+  });
+
+  it("the same candle sent to Punjab is IGST, with the same total", async () => {
+    const result = await place([fruit("Mango")], { state: "Punjab" });
+    const t = await tax(result.order!.id);
+    expect(t.tax_type).toBe("inter_state");
+    expect([Number(t.cgst_amount), Number(t.sgst_amount), Number(t.igst_amount)]).toEqual([0, 0, 7.14]);
+    expect(Number(t.taxable_value)).toBe(142.86);
+    expect(Number(t.total)).toBe(150);
+  });
+
+  it("never adds GST on top, for any quantity or mix of items", async () => {
+    for (const state of ["Maharashtra", "Punjab", "Kerala"]) {
+      const result = await place([fruit("Mango", 3), daisy(2, "Set of 2"), fruit("Blueberry", 1, "Set of 6")], { state });
+      const t = await tax(result.order!.id);
+      expect(Number(t.total)).toBe(3 * 150 + 2 * 579 + 810);
+      expect(Number(t.taxable_value) + Number(t.cgst_amount) + Number(t.sgst_amount) + Number(t.igst_amount)).toBeCloseTo(Number(t.total), 2);
+      const lines = await q<{ line_total: string; taxable_value: string; tax_amount: string; gst_rate: string }>("select line_total, taxable_value, tax_amount, gst_rate from public.order_items where order_id = $1", [result.order!.id]);
+      for (const l of lines) {
+        expect(Number(l.gst_rate)).toBe(5);
+        expect(Number(l.taxable_value) + Number(l.tax_amount)).toBeCloseTo(Number(l.line_total), 2);
+      }
+    }
+  });
+
+  it("charges the flat shipping fee once per order and includes it in the tax breakdown", async () => {
+    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_fee": 100, "seller_state": "Maharashtra", "default_gst_rate": 5}')`);
+    try {
+      const one = await place([fruit("Mango")], { state: "Maharashtra" });
+      const many = await place([fruit("Mango", 7), daisy(3), fruit("Blueberry", 2, "Set of 4")], { state: "Punjab" });
+      const a = await tax(one.order!.id);
+      const b = await tax(many.order!.id);
+      expect(Number(a.shipping_amount)).toBe(100);
+      expect(Number(b.shipping_amount)).toBe(100);
+      expect(Number(a.total)).toBe(250);
+      expect(Number(b.total)).toBe(7 * 150 + 3 * 299 + 2 * 555 + 100);
+      // ₹150 + ₹100 at 5%: 142.86 + 95.24 taxable, 3.57 + 2.38 for each of CGST and SGST
+      expect(Number(a.shipping_taxable_value)).toBe(95.24);
+      expect(Number(a.shipping_gst_rate)).toBe(5);
+      expect(Number(a.taxable_value)).toBe(238.1);
+      expect([Number(a.cgst_amount), Number(a.sgst_amount)]).toEqual([5.95, 5.95]);
+      expect(Number(b.taxable_value) + Number(b.igst_amount)).toBeCloseTo(Number(b.total), 2);
+    } finally {
+      await db.query("delete from public.site_settings where key = 'store'");
+    }
+  });
+
+  it("uses the configured rates: a store default and a per-product override", async () => {
+    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_fee": 0, "seller_state": "Punjab", "default_gst_rate": 12}')`);
+    await db.query("update public.products set gst_rate = 18 where id = $1", [ids.product.get("Daisy Bowl Jar Candle")]);
+    try {
+      const result = await place([fruit("Mango"), daisy(1)], { state: "Punjab" });
+      const t = await tax(result.order!.id);
+      expect(t.tax_type).toBe("intra_state"); // the seller is now in Punjab
+      expect(t.seller_state).toBe("Punjab");
+      const lines = await q<{ product_name: string; gst_rate: string; taxable_value: string }>("select product_name, gst_rate, taxable_value from public.order_items where order_id = $1 order by product_name", [result.order!.id]);
+      expect(lines.map((l) => [l.product_name, Number(l.gst_rate)])).toEqual([["Daisy Bowl Jar Candle", 18], ["Fruit Shot Glass Candle", 12]]);
+      expect(Number(lines[1].taxable_value)).toBe(133.92); // 150 - 2 x round(8.0357, 2)
+    } finally {
+      await db.query("delete from public.site_settings where key = 'store'");
+      await db.query("update public.products set gst_rate = null where id = $1", [ids.product.get("Daisy Bowl Jar Candle")]);
+    }
+  });
+
+  it("treats the GSTIN as optional, stores it in capitals and rejects a malformed one", async () => {
+    const without = await place([fruit("Mango")], { state: "Goa" });
+    expect((await tax(without.order!.id)).customer_gstin).toBeNull();
+    const withGstin = await place([fruit("Mango")], { state: "Goa", gstin: "27aapfu0939f1zv" });
+    expect((await tax(withGstin.order!.id)).customer_gstin).toBe("27AAPFU0939F1ZV");
+    await expect(place([fruit("Mango")], { state: "Goa", gstin: "NOT-A-GSTIN" })).rejects.toThrow();
+  });
+
+  it("gst_split reconciles to the amount for awkward values", async () => {
+    for (const [amount, rate] of [[150, 5], [299, 5], [579, 12], [1, 18], [99.99, 28], [810, 5], [100, 0]]) {
+      for (const intra of [true, false]) {
+        const [r] = await q<{ taxable: string; cgst: string; sgst: string; igst: string }>("select * from public.gst_split($1, $2, $3)", [amount, rate, intra]);
+        expect(Number(r.taxable) + Number(r.cgst) + Number(r.sgst) + Number(r.igst)).toBeCloseTo(amount, 2);
+        expect(Number(r.cgst)).toBe(Number(r.sgst));
+      }
+    }
+  });
+
+  it("keeps the sale badge off unless an administrator turns it on", async () => {
+    const [{ on: before }] = await q<{ on: number }>("select count(*)::int as on from public.products where on_sale");
+    expect(before).toBe(0);
+    await as("anon", null, async () => { expect(await blocked("update public.products set on_sale = true")).toBe(true); });
+    await as("authenticated", adminId, async () => {
+      expect((await db.query("update public.products set on_sale = true where slug = 'velvet-shot-glass-candle'")).affectedRows).toBe(1);
+    });
+    await as("anon", null, async () => {
+      const rows = await q<{ slug: string }>("select slug from public.products where on_sale");
+      expect(rows.map((r) => r.slug)).toEqual(["velvet-shot-glass-candle"]);
+    });
+    await db.query("update public.products set on_sale = false");
+  });
+});
+
 describe("inventory", () => {
   const sunflower = (qty: number, pack: string) => ({
     variant_id: variant("Sunflower Bowl Jar Candle", pack),
-    option_value_ids: [value("Sunflower Bowl Jar Candle", "Hue", "Ivory"), value("Sunflower Bowl Jar Candle", "Scent", "White Musk")],
+    units: forEachCandle([value("Sunflower Bowl Jar Candle", "Hue", "Ivory"), value("Sunflower Bowl Jar Candle", "Scent", "White Musk")], pack),
     quantity: qty,
   });
   const stock = async () => (await q<{ stock_quantity: number }>("select stock_quantity from public.products where id = $1", [ids.product.get("Sunflower Bowl Jar Candle")]))[0].stock_quantity;

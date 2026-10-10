@@ -103,6 +103,8 @@ export async function saveProduct(input: unknown): Promise<ActionResult<{ id: st
       status: d.status,
       is_coming_soon: d.is_coming_soon,
       is_bestseller: d.is_bestseller,
+      on_sale: d.on_sale,
+      gst_rate: d.gst_rate,
       sort_order: d.sort_order,
       track_inventory: d.track_inventory,
       stock_quantity: d.stock_quantity,

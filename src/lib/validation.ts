@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidGstin } from "@/lib/gst";
 
 export const INDIAN_STATES = [
   "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana",
@@ -32,6 +33,11 @@ export const customerSchema = z.object({
     .trim()
     .refine((v) => normalizeIndianMobile(v) !== null, "Enter a valid 10-digit mobile number"),
   email: z.union([z.literal(""), z.email("Enter a valid email address").max(254)]),
+  /** Optional. Checked only when the customer enters one. */
+  gstin: z
+    .string()
+    .trim()
+    .refine((v) => v === "" || isValidGstin(v), "Enter a valid 15-character GSTIN, or leave this empty"),
   address_line1: text(3, 200, "Address"),
   address_line2: z.string().trim().max(200, "Address line is too long"),
   city: text(2, 80, "City"),
@@ -43,7 +49,8 @@ export type CustomerInput = z.infer<typeof customerSchema>;
 
 export const cartItemSchema = z.object({
   variant_id: z.uuid(),
-  option_value_ids: z.array(z.uuid()).max(12),
+  /** One list of chosen option-value ids per candle in the pack. */
+  units: z.array(z.array(z.uuid()).max(12)).min(1).max(48),
   quantity: z.number().int().min(1).max(50),
 });
 export type CartItemInput = z.infer<typeof cartItemSchema>;
@@ -91,6 +98,11 @@ export const productSchema = z.object({
   status: z.enum(["draft", "published", "archived"]),
   is_coming_soon: z.boolean(),
   is_bestseller: z.boolean(),
+  on_sale: z.boolean(),
+  /** Empty means "use the store default GST rate". */
+  gst_rate: z
+    .union([z.literal(""), z.null(), z.coerce.number<number>().min(0, "Must be 0 or more").max(40, "Must be 40 or less")])
+    .transform((v) => (v === "" || v === null ? null : v)),
   sort_order: z.coerce.number<number>().int().min(0).max(100000),
   track_inventory: z.boolean(),
   stock_quantity: z.coerce.number<number>().int().min(0).max(1_000_000),
@@ -163,6 +175,8 @@ export const storeSettingsSchema = z.object({
   free_shipping_above: z
     .union([z.literal(""), z.null(), money])
     .transform((v) => (v === "" || v === null ? null : v)),
+  seller_state: z.enum(INDIAN_STATES, "Select the state the business is registered in"),
+  default_gst_rate: z.coerce.number<number>().min(0, "Must be 0 or more").max(40, "Must be 40 or less"),
 });
 
 export const homepageSchema = z.object({

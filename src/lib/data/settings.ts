@@ -11,8 +11,11 @@ export const DEFAULT_STORE: StoreSettings = {
   instagram_url: "",
   address: "",
   business_hours: "",
+  // The real charge lives in the store settings (seeded as 100); with no settings at all nothing is charged.
   shipping_fee: 0,
   free_shipping_above: null,
+  seller_state: "Maharashtra",
+  default_gst_rate: 5,
 };
 
 export const DEFAULT_HOMEPAGE: HomepageSettings = {
@@ -48,6 +51,9 @@ export function normalizeSettings(rows: Row[]): SiteSettings {
   const store = { ...DEFAULT_STORE, ...by.get("store") } as StoreSettings;
   store.whatsapp_number = String(store.whatsapp_number ?? "").replace(/\D/g, "");
   store.shipping_fee = Math.max(0, Number(store.shipping_fee) || 0);
+  store.seller_state = String(store.seller_state || DEFAULT_STORE.seller_state).trim();
+  const rate = Number(store.default_gst_rate);
+  store.default_gst_rate = Number.isFinite(rate) && rate >= 0 && rate <= 40 ? rate : DEFAULT_STORE.default_gst_rate;
   store.free_shipping_above =
     store.free_shipping_above === null || store.free_shipping_above === undefined
       ? null
@@ -85,7 +91,7 @@ export function resolveWhatsAppNumber(store: StoreSettings): string {
   return store.whatsapp_number || (process.env.WHATSAPP_NUMBER ?? "").replace(/\D/g, "");
 }
 
-export type BackendStatus = "ok" | "unconfigured" | "schema_missing" | "unreachable";
+export type BackendStatus = "ok" | "unconfigured" | "schema_missing" | "update_needed" | "unreachable";
 
 /**
  * Whether the storefront is really connected to a usable database. Used to
@@ -96,7 +102,11 @@ export const getBackendStatus = cache(async (): Promise<BackendStatus> => {
   if (!client) return "unconfigured";
   try {
     const { error } = await client.from("site_settings").select("key").limit(1);
-    if (!error) return "ok";
+    if (!error) {
+      // Columns added by migration 0003 (sale badge, GST). Missing means the database needs that update.
+      const probe = await client.from("products").select("on_sale").limit(1);
+      return probe.error?.code === "42703" ? "update_needed" : "ok";
+    }
     // PGRST205 / 42P01: the table does not exist, i.e. the migrations have not been run.
     return error.code === "PGRST205" || error.code === "42P01" ? "schema_missing" : "unreachable";
   } catch {

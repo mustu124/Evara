@@ -236,8 +236,12 @@ await seedSetting("store", async () => ({
   instagram_url: "",
   address: "",
   business_hours: "",
-  shipping_fee: 0,
+  // One flat, GST-inclusive charge per order. Change it in Admin -> Settings.
+  shipping_fee: 100,
   free_shipping_above: null,
+  seller_state: "Maharashtra",
+  // The rate used in the brief's examples. Confirm it before going live; products can override it.
+  default_gst_rate: 5,
 }));
 
 await seedSetting("homepage", async () => {

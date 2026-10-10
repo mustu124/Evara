@@ -9,6 +9,15 @@ const BADGES = {
   unavailable: "Unavailable",
 } as const;
 
+/** Shown only on products the administrator has marked as on sale. */
+export function SaleBadge({ className = "" }: { className?: string }) {
+  return (
+    <span className={`rounded-full border border-copper/40 bg-blush-light px-2.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-[0.14em] text-copper-dark shadow-soft ${className}`}>
+      Sale
+    </span>
+  );
+}
+
 export function ProductCard({ product, priority }: { product: ProductSummary; priority?: boolean }) {
   const availability = productAvailability(product);
   const from = startingPrice(product.variants);
@@ -25,6 +34,7 @@ export function ProductCard({ product, priority }: { product: ProductSummary; pr
           priority={priority}
           className="transition-transform duration-500 ease-out group-hover:scale-[1.03]"
         />
+        {product.on_sale && <SaleBadge className="absolute right-3 top-3" />}
         {availability !== "available" && (
           <span className="absolute left-3 top-3 rounded-full bg-ivory/95 px-3 py-1 text-[0.65rem] font-medium uppercase tracking-[0.16em] text-cocoa">
             {BADGES[availability]}

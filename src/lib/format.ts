@@ -1,5 +1,5 @@
 import { supabaseUrl } from "@/lib/env";
-import type { ProductSummary, Variant } from "@/lib/types";
+import type { ProductSummary, SelectedOption, Variant } from "@/lib/types";
 
 const inr = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 0 });
 
@@ -63,4 +63,20 @@ export function startingPrice<V extends Pick<Variant, "price" | "is_available" |
   if (variants.length === 0) return null;
   const pool = variants.some(isVariantOrderable) ? variants.filter(isVariantOrderable) : variants;
   return pool.reduce((min, v) => (v.price < min.price ? v : min));
+}
+
+/**
+ * Splits an order line's stored choices into one list per candle. Orders
+ * placed before sets carried per-candle choices have no candle number and are
+ * returned as a single list.
+ */
+export function groupByCandle(options: SelectedOption[], packQuantity = 1): SelectedOption[][] {
+  if (!options.some((o) => typeof o.unit === "number")) return options.length ? [options] : [];
+  const count = Math.max(packQuantity, ...options.map((o) => o.unit ?? 1));
+  return Array.from({ length: count }, (_, i) => options.filter((o) => (o.unit ?? 1) === i + 1));
+}
+
+/** ₹142.86 — always two decimals, for tax invoices. */
+export function formatINRExact(amount: number): string {
+  return `₹${new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(amount) || 0)}`;
 }

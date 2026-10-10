@@ -31,7 +31,7 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
       <div className="container-x grid gap-12 py-16 sm:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.2fr]">
         <div>
           <p className="font-serif text-3xl tracking-[0.3em] text-ivory">EVARA</p>
-          <p className="mt-2 font-serif text-lg italic text-blush">{BRAND.tagline}</p>
+          <p className="mt-2 font-serif text-base italic text-blush">{BRAND.tagline}</p>
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-ivory/75">
             Artisan candles, handcrafted in wax with creativity, warmth and good design.
           </p>
@@ -62,7 +62,7 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
         </nav>
 
         <div>
-          <h2 className={heading}>Get in touch</h2>
+          <h2 className={heading}>Contact Us</h2>
           {hasContact ? (
             <ul className="space-y-3">
               {whatsapp && (

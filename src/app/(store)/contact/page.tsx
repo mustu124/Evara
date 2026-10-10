@@ -24,7 +24,7 @@ export default async function ContactPage() {
 
   return (
     <>
-      <PageHeader eyebrow="Say hello" title="We'd love to hear from you" intro="Whether you have a question about an order, want to discuss a custom piece, or are exploring gifting — we're happy to help." />
+      <PageHeader eyebrow="Contact Us" title="We'd love to hear from you" intro="Whether you have a question about an order, want to discuss a custom piece, or are exploring gifting — we're happy to help." />
       <div className="container-x py-12 sm:py-20">
         {cards.length === 0 ? (
           <p className="mx-auto max-w-md text-center text-muted" role="status">

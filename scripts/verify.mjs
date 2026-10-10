@@ -77,6 +77,10 @@ section("Storage buckets");
 
 // ── Schema ───────────────────────────────────────────────────────────────
 section("Database schema");
+// Columns added by supabase/migrations/0003_gst_sets_sale.sql.
+const migration3 = !(await service.from("products").select("on_sale, gst_rate").limit(1)).error
+  && !(await service.from("orders").select("tax_type, taxable_value, customer_gstin").limit(1)).error;
+
 const TABLES = ["profiles", "categories", "collections", "products", "product_collections", "product_options", "product_option_values", "product_variants", "product_images", "orders", "order_items", "site_settings", "testimonials"];
 const missing = [];
 for (const table of TABLES) {
@@ -86,7 +90,8 @@ for (const table of TABLES) {
   if (probe.error) missing.push(table);
 }
 expect(missing.length === 0, `all ${TABLES.length} tables exist`, `missing: ${missing.join(", ")}. Apply the migrations (npm run db:migrate, or the SQL Editor)`);
-const schemaReady = missing.length === 0;
+if (missing.length === 0) expect(migration3, "GST, per-candle sets and sale badge columns exist (migration 0003)", "run supabase/migrations/0003_gst_sets_sale.sql");
+const schemaReady = missing.length === 0 && migration3;
 
 // ── Catalog ──────────────────────────────────────────────────────────────
 section("Catalog (compared with Website Requirement List.pdf)");
@@ -199,21 +204,44 @@ if (!schemaReady || !catalogComplete) {
   const call = (items) => service.rpc("create_order", { p_customer: customer, p_items: items, p_client_hash: null });
 
   const soon = fruit.options[0].values.find((v) => v.is_coming_soon);
-  const refused = await call([{ variant_id: fruit.variants[0].id, option_value_ids: [soon.id], quantity: 1 }]);
+  const fruitSingle = fruit.variants.find((v) => v.label === "Single Piece");
+  const refused = await call([{ variant_id: fruitSingle.id, units: [[soon.id]], quantity: 1 }]);
   expect(refused.data?.ok === false, `a coming-soon design ("${soon.value}") is refused`, JSON.stringify(refused.error ?? refused.data).slice(0, 120));
 
-  const incomplete = await call([{ variant_id: setOf2.id, option_value_ids: picks.slice(0, 1), quantity: 1 }]);
-  expect(incomplete.data?.ok === false, "an item without all of its options chosen is refused");
+  const incomplete = await call([{ variant_id: setOf2.id, units: [picks, picks.slice(0, 1)], quantity: 1 }]);
+  expect(incomplete.data?.ok === false, "a set with an incomplete second candle is refused");
+  const oneCandle = await call([{ variant_id: setOf2.id, units: [picks], quantity: 1 }]);
+  expect(oneCandle.data?.ok === false, "a Set of 2 with choices for only one candle is refused");
+
+  // Candle 2 gets a different value for every option that has more than one available.
+  const otherPicks = daisy.options.map((o) => (o.values.filter((v) => !v.is_coming_soon)[1] ?? o.values.find((v) => !v.is_coming_soon)).id);
 
   // The 1-rupee "price" is a deliberate tampering attempt that must be ignored.
-  const placed = await call([{ variant_id: setOf2.id, option_value_ids: picks, quantity: 2, price: 1, unit_price: 1 }]);
+  const placed = await call([{ variant_id: setOf2.id, units: [picks, otherPicks], quantity: 2, price: 1, unit_price: 1 }]);
   const order = placed.data?.order;
   expect(placed.data?.ok === true, "a valid order is created", JSON.stringify(placed.error ?? placed.data).slice(0, 160));
   if (order) {
     expect(Number(order.subtotal) === 2 * Number(setOf2.price), `the total is priced from the database (2 x ₹${Number(setOf2.price)} = ₹${Number(order.subtotal)}), ignoring the browser's ₹1`);
-    const { data: saved } = await service.from("orders").select("status, payment_status, items:order_items ( unit_price, product_name, variant_label, selected_options )").eq("id", order.id).single();
+    const { data: saved } = await service.from("orders").select("status, payment_status, tax_type, taxable_value, cgst_amount, sgst_amount, igst_amount, shipping_amount, total, items:order_items ( unit_price, product_name, variant_label, selected_options, gst_rate, taxable_value, tax_amount, line_total )").eq("id", order.id).single();
     expect(saved.status === "pending" && saved.payment_status === "unpaid", "the order is stored as pending and unpaid");
-    expect(saved.items.length === 1 && Number(saved.items[0].unit_price) === Number(setOf2.price) && saved.items[0].selected_options.length === daisy.options.length, "the line item stores its own price, name and chosen options");
+    expect(saved.items.length === 1 && Number(saved.items[0].unit_price) === Number(setOf2.price) && saved.items[0].selected_options.length === 2 * daisy.options.length, "the line item stores its own price, name and chosen options");
+    const candles = [1, 2].map((n) => saved.items[0].selected_options.filter((o) => o.unit === n).map((o) => o.value).join(" / "));
+    expect(candles[0] !== candles[1] && candles.every(Boolean), `each candle in the set keeps its own choices (candle 1: ${candles[0]}; candle 2: ${candles[1]})`);
+    const taxSum = Number(saved.taxable_value) + Number(saved.cgst_amount) + Number(saved.sgst_amount) + Number(saved.igst_amount);
+    expect(saved.tax_type === "intra_state" && Number(saved.cgst_amount) === Number(saved.sgst_amount) && Number(saved.cgst_amount) > 0 && Number(saved.igst_amount) === 0,
+      `a Maharashtra delivery is taxed as CGST ₹${saved.cgst_amount} + SGST ₹${saved.sgst_amount}`, JSON.stringify(saved.tax_type));
+    expect(Math.abs(taxSum - Number(saved.total)) < 0.005, `taxable value + GST adds back up to the total exactly (₹${saved.taxable_value} + tax = ₹${saved.total}), so GST is not charged on top`);
+    expect(Number(saved.total) === Number(order.subtotal) + Number(saved.shipping_amount), `shipping (₹${saved.shipping_amount}) is added once to the total`);
+
+    const away = await service.rpc("create_order", { p_customer: { ...customer, state: "Punjab", gstin: "27aapfu0939f1zv" }, p_items: [{ variant_id: fruitSingle.id, units: [[fruit.options[0].values.find((v) => !v.is_coming_soon).id]], quantity: 1 }], p_client_hash: null });
+    if (away.data?.order) {
+      const { data: inter } = await service.from("orders").select("tax_type, igst_amount, cgst_amount, taxable_value, total, shipping_amount, customer_gstin").eq("id", away.data.order.id).single();
+      expect(inter.tax_type === "inter_state" && Number(inter.igst_amount) > 0 && Number(inter.cgst_amount) === 0, `a Punjab delivery is taxed as IGST ₹${inter.igst_amount}`);
+      expect(inter.customer_gstin === "27AAPFU0939F1ZV", "an optional GSTIN is stored with the order");
+      await service.from("orders").delete().eq("id", away.data.order.id);
+    } else {
+      report("fail", "an inter-state order with a GSTIN is created", JSON.stringify(away.error ?? away.data).slice(0, 160));
+    }
     expect(/^EV-\d{6}-[A-Z2-9]{5}$/.test(order.reference), `the order has a reference (${order.reference})`);
     expect(((await anon.from("orders").select("id").eq("id", order.id)).data ?? []).length === 0, "a visitor cannot read that order, even knowing its id");
 

@@ -22,20 +22,21 @@ export default async function AboutPage() {
         {paragraphs.length === 0 ? (
           <EmptyState title="Our story is coming soon" action={{ href: "/shop", label: "Browse the shop" }} />
         ) : (
-          <div className="grid gap-12 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] lg:gap-20">
+          <div>
             {about.founders.length > 0 && (
-              <div className="mx-auto grid w-full max-w-md grid-cols-2 gap-4 lg:sticky lg:top-28 lg:max-w-none lg:grid-cols-1 lg:gap-8 lg:self-start">
+              // Large portrait frames in the photos' own 9:16 shape, so nothing is cropped.
+              <div className={`mx-auto mb-12 grid w-full gap-4 sm:gap-8 ${about.founders.length === 1 ? "max-w-sm grid-cols-1" : "max-w-[19rem] grid-cols-1 sm:max-w-3xl sm:grid-cols-2"}`}>
                 {about.founders.map((f) => (
                   <figure key={f.image_path}>
-                    <div className="relative aspect-[4/5] overflow-hidden rounded-lg bg-blush/40 shadow-soft ring-1 ring-line">
-                      <StorageImage path={f.image_path} alt={f.name ? `${f.name}, co-founder of ${BRAND.name}` : `${BRAND.name} founder`} sizes="(min-width: 1024px) 20rem, 45vw" priority />
+                    <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-blush-light shadow-soft ring-1 ring-line">
+                      <StorageImage path={f.image_path} alt={f.name ? `${f.name}, co-founder of ${BRAND.name}` : `${BRAND.name} founder`} sizes="(min-width: 640px) 24rem, 19rem" priority className="object-top" />
                     </div>
-                    {f.name && <figcaption className="mt-3 text-center font-serif text-xl text-cocoa">{f.name}</figcaption>}
+                    {f.name && <figcaption className="mt-3 text-center font-serif text-2xl text-cocoa">{f.name}</figcaption>}
                   </figure>
                 ))}
               </div>
             )}
-            <article className={`prose-evara max-w-2xl text-[1.05rem] ${about.founders.length === 0 ? "mx-auto lg:col-span-2" : ""}`}>
+            <article className="prose-evara mx-auto max-w-2xl text-[1.05rem]">
               {paragraphs.map((p, i) =>
                 i === 0 ? (
                   <p key={i} className="!mb-8 font-serif text-2xl !leading-snug text-cocoa sm:text-3xl">{p}</p>

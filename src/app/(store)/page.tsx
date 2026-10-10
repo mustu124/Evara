@@ -68,7 +68,7 @@ export default async function HomePage() {
       )}
 
       {sections.bestsellers && bestsellers.length > 0 && (
-        <section className="section bg-blush">
+        <section className="section bg-blush-light">
           <div className="container-x">
             <SectionHeading eyebrow="Favourites" title="Our Bestsellers" />
             <ProductGrid products={bestsellers} />

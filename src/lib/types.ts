@@ -68,6 +68,7 @@ export type ProductSummary = {
   slug: string;
   is_coming_soon: boolean;
   is_bestseller: boolean;
+  on_sale: boolean;
   track_inventory: boolean;
   stock_quantity: number;
   sort_order: number;
@@ -81,6 +82,7 @@ export type ProductDetail = Omit<ProductSummary, "images"> & {
   description: string;
   status: ProductStatus;
   low_stock_threshold: number;
+  gst_rate: number | null;
   specifications: Specification[];
   options: ProductOption[];
   images: ProductImage[];
@@ -105,8 +107,13 @@ export type StoreSettings = {
   instagram_url: string;
   address: string;
   business_hours: string;
+  /** Flat, GST-inclusive charge added once per order. */
   shipping_fee: number;
   free_shipping_above: number | null;
+  /** State the business is registered in; decides CGST+SGST versus IGST. */
+  seller_state: string;
+  /** GST % included in prices, unless a product sets its own rate. */
+  default_gst_rate: number;
 };
 
 export type HomepageSettings = {
@@ -139,7 +146,8 @@ export type SiteSettings = { store: StoreSettings; homepage: HomepageSettings; a
 export type OrderStatus = "pending" | "confirmed" | "processing" | "shipped" | "completed" | "cancelled";
 export type PaymentStatus = "unpaid" | "paid" | "refunded";
 
-export type SelectedOption = { name: string; value: string };
+/** One choice for one candle. `unit` is the candle number within a pack (absent on older orders). */
+export type SelectedOption = { unit?: number; name: string; value: string };
 
 export type OrderItem = {
   id?: string;
@@ -154,6 +162,9 @@ export type OrderItem = {
   quantity: number;
   line_total: number;
   image_path: string | null;
+  gst_rate?: number;
+  taxable_value?: number;
+  tax_amount?: number;
 };
 
 export type Order = {
@@ -164,6 +175,7 @@ export type Order = {
   customer_name: string;
   customer_phone: string;
   customer_email: string | null;
+  customer_gstin?: string | null;
   address_line1: string;
   address_line2: string | null;
   city: string;
@@ -174,6 +186,14 @@ export type Order = {
   subtotal: number;
   shipping_amount: number;
   total: number;
+  /** GST breakdown; tax_type is null on orders placed before GST was recorded. */
+  seller_state?: string | null;
+  tax_type?: "intra_state" | "inter_state" | null;
+  taxable_value?: number;
+  cgst_amount?: number;
+  sgst_amount?: number;
+  igst_amount?: number;
+  shipping_gst_rate?: number;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { ArrowLeft, Check, Copy, Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { placeOrder, reviewCart, type CartReview, type PlaceOrderResult } from "@/app/actions/order";
 import { ArchOrnament, WhatsAppIcon } from "@/components/icons";
 import { EmptyState } from "@/components/store/bits";
 import { cart, MAX_LINE_QUANTITY, useCart, type CartLine } from "@/lib/cart";
-import { formatINR, imageUrl } from "@/lib/format";
+import { formatINR, formatINRExact, imageUrl } from "@/lib/format";
+import { buildInvoice, formatRate, type Invoice } from "@/lib/gst";
 import { customerSchema, INDIAN_STATES, type CustomerInput } from "@/lib/validation";
 
 type Confirmation = Extract<PlaceOrderResult, { ok: true }>;
@@ -23,9 +24,51 @@ const toItems = (lines: CartLine[]) =>
   lines.map((l) => ({
     key: l.key,
     variant_id: l.variantId,
-    option_value_ids: l.options.map((o) => o.valueId),
+    units: l.units.map((unit) => unit.map((c) => c.valueId)),
     quantity: l.quantity,
   }));
+
+/** Marks a mandatory field. */
+function Req() {
+  return (
+    <>
+      <span aria-hidden className="text-copper-dark">*</span>
+      <span className="sr-only">(required)</span>
+    </>
+  );
+}
+
+/** The GST already contained in the total: CGST + SGST within the seller's state, IGST otherwise. */
+function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<Invoice, "taxable" | "cgst" | "sgst" | "igst" | "intraState" | "rate" | "total">; stateChosen: boolean; className?: string }) {
+  const at = (rate: number | null, half = false) => (rate === null ? "" : ` @ ${formatRate(half ? rate / 2 : rate)}%`);
+  const row = "flex justify-between gap-3";
+  return (
+    <div className={`rounded-lg border border-line bg-canvas p-3.5 ${className}`}>
+      <p className="text-xs font-medium text-cocoa">GST included in the total</p>
+      <dl className="mt-2 space-y-1 text-xs text-muted">
+        {stateChosen ? (
+          <>
+            <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
+            {invoice.intraState ? (
+              <>
+                <div className={row}><dt>CGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst)}</dd></div>
+                <div className={row}><dt>SGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.sgst)}</dd></div>
+              </>
+            ) : (
+              <div className={row}><dt>IGST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.igst)}</dd></div>
+            )}
+            <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
+          </>
+        ) : (
+          <>
+            <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
+            <p className="pt-0.5">Choose your delivery state at checkout to see the CGST / SGST or IGST split.</p>
+          </>
+        )}
+      </dl>
+    </div>
+  );
+}
 
 export function CartView() {
   const hydrated = useHydrated();
@@ -43,11 +86,13 @@ export function CartView() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors, isSubmitting },
   } = useForm<CustomerInput>({
     resolver: zodResolver(customerSchema),
-    defaultValues: { name: "", phone: "", email: "", address_line1: "", address_line2: "", city: "", pincode: "", note: "" },
+    defaultValues: { name: "", phone: "", email: "", gstin: "", address_line1: "", address_line2: "", city: "", pincode: "", note: "" },
   });
+  const deliveryState = useWatch({ control, name: "state" }) ?? "";
 
   // A just-created order survives a refresh so its reference is not lost.
   const restored = useMemo<Confirmation | null>(() => {
@@ -86,7 +131,7 @@ export function CartView() {
         cart.patch(updates);
       } catch {
         if (!cancelled) {
-          setReviewState({ signature, review: { ok: false, error: "We could not check your cart just now.", lines: [], subtotal: 0, shipping: 0, total: 0, whatsappConfigured: false } });
+          setReviewState({ signature, review: { ok: false, error: "We could not check your cart just now.", lines: [], subtotal: 0, shipping: 0, shippingGstRate: 0, total: 0, sellerState: "", whatsappConfigured: false } });
         }
       }
     }, 250);
@@ -104,6 +149,17 @@ export function CartView() {
   const subtotal = review?.ok ? review.subtotal : localSubtotal;
   const shipping = review?.ok ? review.shipping : 0;
   const total = subtotal + shipping;
+  // GST is already inside these prices. The split (CGST + SGST, or IGST) depends on the delivery state.
+  const invoice = useMemo<Invoice | null>(() => {
+    if (!review?.ok) return null;
+    const amounts = lines.flatMap((l) => {
+      const r = reviewed.get(l.key);
+      return r?.ok && r.unitPrice !== undefined ? [{ amount: r.unitPrice * l.quantity, rate: r.gstRate ?? 0 }] : [];
+    });
+    if (review.shipping > 0) amounts.push({ amount: review.shipping, rate: review.shippingGstRate });
+    // Until a state is chosen the split is unknown; the total tax is the same either way to within a paisa.
+    return buildInvoice(amounts, deliveryState || "-", review.sellerState);
+  }, [review, reviewed, lines, deliveryState]);
   const hasProblems = lines.some((l) => reviewed.get(l.key)?.ok === false || lineErrors[l.key]);
   const canCheckout = lines.length > 0 && !reviewing && review?.ok === true && !hasProblems && review.whatsappConfigured;
 
@@ -124,7 +180,7 @@ export function CartView() {
     try {
       result = await placeOrder({
         customer,
-        items: toItems(submitted).map(({ variant_id, option_value_ids, quantity }) => ({ variant_id, option_value_ids, quantity })),
+        items: toItems(submitted).map(({ variant_id, units, quantity }) => ({ variant_id, units, quantity })),
         website: honeypot instanceof HTMLInputElement ? honeypot.value : "",
       });
     } catch {
@@ -177,6 +233,20 @@ export function CartView() {
           <p className="font-serif text-3xl tracking-wide text-cocoa">{confirmation.reference}</p>
           <p className="mt-1 text-sm text-muted">Total {formatINR(confirmation.total)}</p>
         </div>
+
+        {confirmation.invoice && confirmation.invoice.taxable > 0 && (
+          <div className="card mt-4 p-5 text-left">
+            <dl className="space-y-1.5 text-sm">
+              <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(confirmation.invoice.subtotal)}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd>{confirmation.invoice.shipping > 0 ? formatINR(confirmation.invoice.shipping) : "Free"}</dd></div>
+            </dl>
+            <TaxBreakdown
+              className="mt-3"
+              stateChosen
+              invoice={{ ...confirmation.invoice, total: confirmation.invoice.total }}
+            />
+          </div>
+        )}
 
         {popupBlocked && (
           <p role="alert" className="mt-6 rounded-xl border border-blush bg-ivory px-4 py-3 text-sm text-cocoa">
@@ -279,9 +349,16 @@ export function CartView() {
                   </div>
                   <dl className="mt-1 space-y-0.5 text-sm text-muted">
                     <div className="flex gap-1.5"><dt>Pack size:</dt><dd className="text-cocoa">{line.variantLabel}</dd></div>
-                    {line.options.map((o) => (
-                      <div key={o.valueId} className="flex gap-1.5"><dt>{o.name}:</dt><dd className="text-cocoa">{o.value}</dd></div>
-                    ))}
+                    {line.units.length <= 1
+                      ? (line.units[0] ?? []).map((o) => (
+                          <div key={o.valueId} className="flex gap-1.5"><dt>{o.name}:</dt><dd className="text-cocoa">{o.value}</dd></div>
+                        ))
+                      : line.units.map((unit, n) => (
+                          <div key={n} className="flex gap-1.5">
+                            <dt className="shrink-0">Candle {n + 1}:</dt>
+                            <dd className="text-cocoa">{unit.map((o) => `${o.name} ${o.value}`).join(", ")}</dd>
+                          </div>
+                        ))}
                     <div className="flex gap-1.5"><dt>Price:</dt><dd>{formatINR(line.unitPrice)} each</dd></div>
                   </dl>
                   {problem && <p role="alert" className="field-error">{problem}</p>}
@@ -312,46 +389,46 @@ export function CartView() {
         {step === "details" && (
           <div ref={detailsRef} className="mt-10 scroll-mt-28 border-t border-line pt-10">
             <h2 className="text-3xl">Delivery details</h2>
-            <p className="mt-2 text-sm text-muted">We use these only to prepare and deliver your order.</p>
+            <p className="mt-2 text-sm text-muted">We use these only to prepare and deliver your order. Fields marked <Req /> are mandatory.</p>
             <form id="checkout-form" onSubmit={onSubmit} noValidate className="mt-7 grid gap-5 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <label htmlFor="checkout-name" className="field-label">Full name</label>
-                <input type="text" autoComplete="name" className="input" {...field("name")} />
+                <label htmlFor="checkout-name" className="field-label">Full name <Req /></label>
+                <input type="text" autoComplete="name" className="input" required aria-required="true" {...field("name")} />
                 {fieldError("name")}
               </div>
               <div>
-                <label htmlFor="checkout-phone" className="field-label">Mobile number</label>
-                <input type="tel" inputMode="tel" autoComplete="tel" placeholder="10-digit mobile number" className="input" {...field("phone")} />
+                <label htmlFor="checkout-phone" className="field-label">Mobile number <Req /></label>
+                <input type="tel" inputMode="tel" autoComplete="tel" placeholder="10-digit mobile number" className="input" required aria-required="true" {...field("phone")} />
                 {fieldError("phone")}
               </div>
               <div>
-                <label htmlFor="checkout-email" className="field-label">Email <span className="font-normal text-muted">(optional)</span></label>
+                <label htmlFor="checkout-email" className="field-label">Email</label>
                 <input type="email" autoComplete="email" className="input" {...field("email")} />
                 {fieldError("email")}
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="checkout-address_line1" className="field-label">Address line 1</label>
-                <input type="text" autoComplete="address-line1" placeholder="Flat / house no., street, area" className="input" {...field("address_line1")} />
+                <label htmlFor="checkout-address_line1" className="field-label">Address line 1 <Req /></label>
+                <input type="text" autoComplete="address-line1" placeholder="Flat / house no., street, area" className="input" required aria-required="true" {...field("address_line1")} />
                 {fieldError("address_line1")}
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="checkout-address_line2" className="field-label">Address line 2 <span className="font-normal text-muted">(optional)</span></label>
+                <label htmlFor="checkout-address_line2" className="field-label">Address line 2</label>
                 <input type="text" autoComplete="address-line2" placeholder="Landmark, colony" className="input" {...field("address_line2")} />
                 {fieldError("address_line2")}
               </div>
               <div>
-                <label htmlFor="checkout-city" className="field-label">City</label>
-                <input type="text" autoComplete="address-level2" className="input" {...field("city")} />
+                <label htmlFor="checkout-city" className="field-label">City <Req /></label>
+                <input type="text" autoComplete="address-level2" className="input" required aria-required="true" {...field("city")} />
                 {fieldError("city")}
               </div>
               <div>
-                <label htmlFor="checkout-pincode" className="field-label">Pincode</label>
-                <input type="text" inputMode="numeric" autoComplete="postal-code" maxLength={6} className="input" {...field("pincode")} />
+                <label htmlFor="checkout-pincode" className="field-label">Pincode <Req /></label>
+                <input type="text" inputMode="numeric" autoComplete="postal-code" maxLength={6} className="input" required aria-required="true" {...field("pincode")} />
                 {fieldError("pincode")}
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="checkout-state" className="field-label">State / UT</label>
-                <select autoComplete="address-level1" defaultValue="" className="input" {...field("state")}>
+                <label htmlFor="checkout-state" className="field-label">State / UT <Req /></label>
+                <select autoComplete="address-level1" defaultValue="" className="input" required aria-required="true" {...field("state")}>
                   <option value="" disabled>Select state / UT</option>
                   {INDIAN_STATES.map((s) => (
                     <option key={s} value={s}>{s}</option>
@@ -360,7 +437,12 @@ export function CartView() {
                 {fieldError("state")}
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="checkout-note" className="field-label">Order note <span className="font-normal text-muted">(optional)</span></label>
+                <label htmlFor="checkout-gstin" className="field-label">GSTIN</label>
+                <input type="text" autoComplete="off" autoCapitalize="characters" maxLength={15} placeholder="Only if you have one, e.g. 27ABCDE1234F1Z5" className="input uppercase placeholder:normal-case" {...field("gstin")} />
+                {fieldError("gstin")}
+              </div>
+              <div className="sm:col-span-2">
+                <label htmlFor="checkout-note" className="field-label">Order note</label>
                 <textarea rows={3} maxLength={500} className="input" {...field("note")} />
                 {fieldError("note")}
               </div>
@@ -381,13 +463,16 @@ export function CartView() {
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(subtotal)}</dd></div>
             <div className="flex justify-between">
               <dt className="text-muted">Shipping</dt>
-              <dd>{shipping > 0 ? formatINR(shipping) : "Confirmed on WhatsApp"}</dd>
+              <dd>{shipping > 0 ? formatINR(shipping) : review?.ok && subtotal > 0 ? "Free" : "—"}</dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-line pt-4 text-base">
               <dt className="font-medium text-cocoa">Total</dt>
               <dd className="text-2xl font-semibold text-copper-dark">{formatINR(total)}</dd>
             </div>
           </dl>
+          <p className="mt-1 text-right text-xs text-muted">Prices are inclusive of applicable GST.</p>
+
+          {invoice && invoice.total > 0 && <TaxBreakdown invoice={invoice} stateChosen={Boolean(deliveryState)} className="mt-5" />}
 
           {formError && <p role="alert" className="mt-5 rounded-xl border border-blush bg-ivory px-4 py-3 text-sm text-cocoa">{formError}</p>}
           {review?.ok && !review.whatsappConfigured && (
@@ -399,6 +484,7 @@ export function CartView() {
 
           {step === "cart" ? (
             <button
+              key="proceed"
               type="button"
               className="btn-primary mt-6 w-full"
               disabled={!canCheckout}
@@ -414,7 +500,7 @@ export function CartView() {
               Proceed to WhatsApp
             </button>
           ) : (
-            <button type="submit" form="checkout-form" className="btn-primary mt-6 w-full" disabled={!canCheckout || isSubmitting}>
+            <button key="send" type="submit" form="checkout-form" className="btn-primary mt-6 w-full" disabled={!canCheckout || isSubmitting}>
               {isSubmitting ? <Loader2 aria-hidden className="size-4 animate-spin" /> : <WhatsAppIcon className="size-4" />}
               {isSubmitting ? "Preparing order…" : `Send order · ${formatINR(total)}`}
             </button>
