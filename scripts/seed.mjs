@@ -54,10 +54,16 @@ Check your connection (and that "npm run db:storage" has been run), then run the
 const categoryIds = new Map();
 async function seedCategory(cat, parentId, sort) {
   const slug = slugify(cat.name);
-  const { data: existing, error: readError } = await supabase.from("categories").select("id").eq("slug", slug).maybeSingle();
+  const { data: existing, error: readError } = await supabase.from("categories").select("id, image_path").eq("slug", slug).maybeSingle();
   check(readError, `Reading category ${cat.name}`);
   if (existing) {
     categoryIds.set(cat.name, existing.id);
+    // Only fills a missing photo; never replaces one chosen in the admin panel.
+    if (!existing.image_path && cat.image) {
+      const { error } = await supabase.from("categories").update({ image_path: await upload("collection-images", cat.image) }).eq("id", existing.id);
+      check(error, `Adding a photo to ${cat.name}`);
+      info(`${cat.name}: added a category photo`);
+    }
     return false;
   }
   const { data, error } = await supabase

@@ -7,6 +7,7 @@
 export const categories = [
   {
     name: "Jar Candles",
+    image: "products/sunflower/sunflower-bowl-jar-candles.jpeg",
     children: [
       { name: "Shot Glass Candles", image: "products/fruit/strawberry.jpeg" },
       { name: "Bowl Jar Candles", image: "products/daisy/daisy-bowl-jar-candles.jpeg" },

@@ -25,31 +25,44 @@ export default async function HomePage() {
   ]);
   const { hero, sections } = settings.homepage;
 
-  // Categories with a photo are shown as cards; the full list lives on the shop page.
-  const pictured = categories.filter((c) => c.image_path);
+  // The main category headings (not their sub-categories), in catalog order.
+  const mainCategories = categories.filter((c) => !c.parent_id);
 
   return (
     <>
       <Hero hero={hero} />
 
-      {sections.categories && pictured.length > 0 && (
+      {sections.categories && mainCategories.length > 0 && (
         <section className="section">
           <div className="container-x">
             <SectionHeading eyebrow="Explore" title="Shop by Category" />
-              <ul className={`grid gap-5 sm:gap-6 ${pictured.length >= 3 ? "grid-cols-2 lg:grid-cols-3" : "mx-auto max-w-3xl grid-cols-2"}`}>
-                {pictured.map((c) => (
-                  <li key={c.id}>
-                    <Link href={`/categories/${c.slug}`} className="group relative block aspect-[4/5] overflow-hidden rounded-xl bg-blush shadow-soft">
-                      <StorageImage path={c.image_path} alt="" sizes="(min-width: 1024px) 33vw, 50vw" className="transition-transform duration-700 ease-out group-hover:scale-[1.04]" />
-                      <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
-                      <span className="absolute inset-x-0 bottom-0 p-5 font-serif text-2xl text-ivory sm:p-6 sm:text-3xl">
-                        {c.name}
-                        {c.is_coming_soon && <span className="mt-1 block font-sans text-[0.65rem] not-italic uppercase tracking-[0.2em]">Coming soon</span>}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+            <ul className="grid grid-cols-2 gap-4 sm:gap-6 lg:grid-cols-3">
+              {mainCategories.map((c) => (
+                <li key={c.id}>
+                  <Link
+                    href={`/categories/${c.slug}`}
+                    className="group relative flex aspect-[4/3] flex-col items-center justify-center overflow-hidden rounded-xl border border-line bg-ivory p-4 text-center shadow-soft transition-[box-shadow,border-color] duration-300 hover:border-copper/50 hover:shadow-lift"
+                  >
+                    {c.image_path ? (
+                      <>
+                        <StorageImage path={c.image_path} alt="" sizes="(min-width: 1024px) 33vw, 50vw" className="transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
+                        <span aria-hidden className="absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/60 to-transparent" />
+                        <span className="absolute inset-x-0 bottom-0 p-4 text-left font-serif text-xl text-ivory sm:p-6 sm:text-3xl">
+                          {c.name}
+                          {c.is_coming_soon && <span className="mt-0.5 block font-sans text-xs">Coming soon</span>}
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <ArchOrnament className="w-10 text-copper sm:w-12" />
+                        <span className="mt-3 font-serif text-xl text-cocoa sm:text-[1.7rem]">{c.name}</span>
+                        <span className="mt-1 text-xs text-muted sm:text-sm">{c.is_coming_soon ? "Coming soon" : "Explore"}</span>
+                      </>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         </section>
       )}
