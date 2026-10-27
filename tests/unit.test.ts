@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatINR, groupByCandle, productAvailability, slugify, startingPrice } from "@/lib/format";
 import { buildInvoice, gstSplit, isValidGstin } from "@/lib/gst";
+import { DEFAULT_POLICIES, normalizePolicies, parsePolicy, POLICY_KEYS } from "@/lib/policies";
 import { normalizeSettings } from "@/lib/data/settings";
 import { customerSchema, normalizeIndianMobile, orderRequestSchema, productSchema } from "@/lib/validation";
 import { buildOrderMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
@@ -237,5 +238,23 @@ describe("per-candle choices", () => {
     expect(orderRequestSchema.safeParse({ customer, items: [{ ...base, units: [] }] }).success).toBe(false);
     expect(orderRequestSchema.safeParse({ customer, items: [{ ...base }] }).success).toBe(false);
     expect(orderRequestSchema.safeParse({ customer, items: [{ ...base, units: [["nope"]] }] }).success).toBe(false);
+  });
+});
+
+describe("editable policy pages", () => {
+  it("turns the simple formatting into headings, paragraphs, lists, bold text and safe links", () => {
+    const blocks = parsePolicy("Intro line\ncontinues here.\n\n## Heading\n\n- **One:** first\n- Two\nAfter the list with a [link](/contact).\n\n[bad](javascript:alert(1)) stays text");
+    expect(blocks.map((b) => b.type)).toEqual(["p", "h2", "ul", "p", "p"]);
+    expect(blocks[0]).toEqual({ type: "p", inline: [{ type: "text", text: "Intro line continues here." }] });
+    expect(blocks[2]).toEqual({ type: "ul", items: [[{ type: "bold", text: "One:" }, { type: "text", text: " first" }], [{ type: "text", text: "Two" }]] });
+    expect(blocks[3]).toEqual({ type: "p", inline: [{ type: "text", text: "After the list with a " }, { type: "link", text: "link", href: "/contact" }, { type: "text", text: "." }] });
+    expect(JSON.stringify(blocks[4])).not.toContain("javascript");
+  });
+  it("falls back to the original wording for anything not yet edited", () => {
+    const p = normalizePolicies({ terms: { body: "Custom terms", updated_at: "2026-10-27T10:00:00Z" }, privacy: { body: "   " } });
+    expect(p.terms).toEqual({ body: "Custom terms", updated_at: "2026-10-27T10:00:00Z" });
+    expect(p.privacy.body).toBe(DEFAULT_POLICIES.privacy);
+    expect(p.shipping.updated_at).toBeNull();
+    for (const key of POLICY_KEYS) expect(parsePolicy(DEFAULT_POLICIES[key]).length).toBeGreaterThan(5);
   });
 });

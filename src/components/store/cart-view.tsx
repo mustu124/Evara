@@ -62,7 +62,6 @@ function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<
         ) : (
           <>
             <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
-            <p className="pt-0.5">Choose your delivery state at checkout to see the CGST / SGST or IGST split.</p>
           </>
         )}
       </dl>
@@ -277,9 +276,9 @@ export function CartView() {
         </div>
 
         <ol className="mx-auto mt-10 max-w-md space-y-3 text-left text-sm text-cocoa/90">
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">1.</span> Tap &ldquo;Open WhatsApp&rdquo; and press send on the prefilled message.</li>
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">2.</span> We will reply to confirm availability, delivery and payment details.</li>
-          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">3.</span> Your order is confirmed only once we have replied. No payment has been taken.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">1.</span> Tap &ldquo;Open WhatsApp&rdquo; and click &ldquo;Send&rdquo; button for the pre-filled order message.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">2.</span> We&rsquo;ll reply to confirm product availability, delivery details and payment instructions with you.</li>
+          <li className="flex gap-3"><span className="font-serif text-xl text-copper-dark">3.</span> Your order will be confirmed once we&rsquo;ve replied to confirm it. No payment is collected on this website; payment is to be made via UPI using the QR code we share with you on WhatsApp.</li>
         </ol>
 
         <details className="mx-auto mt-8 max-w-md text-left">
@@ -308,7 +307,7 @@ export function CartView() {
   }
 
   if (lines.length === 0) {
-    return <EmptyState title="Your cart is empty" body="Find a candle you love and it will appear here." action={{ href: "/shop", label: "Continue shopping" }} />;
+    return <EmptyState title="Your cart is empty" body="Discover an item you love and it will be shown here." action={{ href: "/shop", label: "Continue shopping" }} />;
   }
 
   const field = (name: keyof CustomerInput) => ({
@@ -506,7 +505,8 @@ export function CartView() {
             </button>
           )}
           <p className="mt-4 text-center text-xs leading-relaxed text-muted">
-            No online payment is taken. Your order and payment are confirmed with us on WhatsApp.
+            Payment via UPI - Pay after confirming your order on WhatsApp. We&rsquo;ll share a UPI QR code for payment. No
+            payment is taken on this website.
           </p>
         </div>
       </aside>

@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { adminAction, dbError } from "@/lib/auth";
 import { fetchSettings } from "@/lib/data/settings";
+import { normalizePolicies, POLICY_KEYS } from "@/lib/policies";
 import type { ActionResult } from "@/lib/types";
 import {
   aboutSchema,
@@ -60,6 +61,22 @@ export async function saveAbout(input: unknown): Promise<ActionResult> {
     const result = await saveSetting(supabase, "about", parsed.data);
     if (result.ok) await removeDropped(supabase, before, parsed.data.founders.map((f) => f.image_path));
     return result;
+  });
+}
+
+const policyInput = z.object({ policy: z.enum(POLICY_KEYS), body: z.string().trim().min(1, "The policy cannot be empty").max(20000, "The policy is too long") });
+
+/** Saves one policy page's text; the others are kept as they are. */
+export async function savePolicy(input: unknown): Promise<ActionResult> {
+  return adminAction(async ({ supabase }) => {
+    const parsed = policyInput.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const { data } = await supabase.from("site_settings").select("value").eq("key", "policies").maybeSingle();
+    const current = normalizePolicies(data?.value ?? null);
+    const stored = (data?.value && typeof data.value === "object" ? data.value : {}) as Record<string, unknown>;
+    const next = { ...stored, [parsed.data.policy]: { body: parsed.data.body, updated_at: new Date().toISOString() } };
+    if (current[parsed.data.policy].body === parsed.data.body && current[parsed.data.policy].updated_at) return { ok: true };
+    return saveSetting(supabase, "policies", next);
   });
 }
 

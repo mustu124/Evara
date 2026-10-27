@@ -82,7 +82,7 @@ Open <http://localhost:3000>. Sign in at <http://localhost:3000/admin/login>.
 1. **Settings → WhatsApp business number.** Until this is set, customers can fill their cart but cannot check out (the site says so rather than failing).
 2. **Settings → contact details** (email, Instagram link, hours). Empty fields are simply hidden on the site.
 3. **Homepage → Bestsellers.** The seed features all five launch products; choose your real bestsellers.
-4. Review the four policy pages (see *Things to review* below).
+4. Review the four policy pages and edit them in **Admin → Policies** (see *Things to review* below).
 
 ---
 
@@ -158,7 +158,7 @@ Stock is deducted when an order moves to *Confirmed* (or later) and returned if 
 
 ### Admin panel (`/admin`)
 
-Overview · Orders · Products (details, pack sizes, options, specifications, images, collections, inventory; publish, archive, and permanent delete of archived products) · Categories · Collections · Inventory · Homepage (hero banners, section visibility, bestsellers, founders' story, reviews) · Settings (WhatsApp number, contact details, shipping).
+Overview · Orders · Products (details, pack sizes, options, specifications, images, collections, inventory; publish, archive, and permanent delete of archived products) · Categories · Collections · Inventory · Homepage (hero banners, section visibility, bestsellers, founders' story, reviews) · Policies (edit the Privacy Policy, Terms & Conditions, Shipping Policy and Cancellation Policy; each save sets that page's last-updated date) · Settings (WhatsApp number, contact details, shipping).
 
 ### Security
 
@@ -260,7 +260,7 @@ All test accounts, products, images and orders created by these tests were remov
 
 ### Things to review
 
-- **Policy pages** describe how this site works but are general and are not legal advice. Delivery timelines, refund terms and business details must be confirmed by Evara Studios.
+- **Policy pages** describe how this site works but are general and are not legal advice. Delivery timelines, refund terms and business details must be confirmed by Evara Studios. Edit them in Admin → Policies; "Original wording" restores the shipped text.
 - **Bestsellers:** the brief did not say which products sell best, so all five are featured. Adjust in Admin → Homepage.
 - **Collection and category photos** reuse the supplied candle photos as stand-ins. Eight of the nine main category cards have no photo. Replace or add them in Admin → Collections and Admin → Categories.
 - **Collections are empty:** no products are assigned to any collection yet.

@@ -33,7 +33,7 @@ export function SiteFooter({ categories, store }: { categories: Category[]; stor
           <p className="font-serif text-3xl tracking-[0.3em] text-ivory">EVARA</p>
           <p className="mt-2 font-serif text-base italic text-blush">{BRAND.tagline}</p>
           <p className="mt-5 max-w-xs text-sm leading-relaxed text-ivory/75">
-            Artisan candles, handcrafted in wax with creativity, warmth and good design.
+            Artisan candles, thoughtfully designed to bring warmth, beauty and fragrance into your space.
           </p>
         </div>
 
