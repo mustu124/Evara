@@ -236,8 +236,10 @@ await seedSetting("store", async () => ({
   instagram_url: "",
   address: "",
   business_hours: "",
-  // One flat, GST-inclusive charge per order. Change it in Admin -> Settings.
-  shipping_fee: 100,
+  // GST-inclusive shipping per kg of the order's weight (rounded up to whole kg):
+  // within the seller's state, and to every other state. Change them in Admin -> Settings.
+  shipping_rate_intra_per_kg: 80,
+  shipping_rate_inter_per_kg: 120,
   free_shipping_above: null,
   seller_state: "Maharashtra",
   // The rate used in the brief's examples. Confirm it before going live; products can override it.

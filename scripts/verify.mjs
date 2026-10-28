@@ -77,9 +77,11 @@ section("Storage buckets");
 
 // ── Schema ───────────────────────────────────────────────────────────────
 section("Database schema");
-// Columns added by supabase/migrations/0003_gst_sets_sale.sql.
+// Columns added by supabase/migrations/0003_gst_sets_sale.sql and 0004_weight_shipping.sql.
 const migration3 = !(await service.from("products").select("on_sale, gst_rate").limit(1)).error
   && !(await service.from("orders").select("tax_type, taxable_value, customer_gstin").limit(1)).error;
+const migration4 = !(await service.from("products").select("weight_grams").limit(1)).error
+  && !(await service.from("orders").select("total_weight_grams, shipping_weight_kg, shipping_rate_per_kg").limit(1)).error;
 
 const TABLES = ["profiles", "categories", "collections", "products", "product_collections", "product_options", "product_option_values", "product_variants", "product_images", "orders", "order_items", "site_settings", "testimonials"];
 const missing = [];
@@ -91,7 +93,9 @@ for (const table of TABLES) {
 }
 expect(missing.length === 0, `all ${TABLES.length} tables exist`, `missing: ${missing.join(", ")}. Apply the migrations (npm run db:migrate, or the SQL Editor)`);
 if (missing.length === 0) expect(migration3, "GST, per-candle sets and sale badge columns exist (migration 0003)", "run supabase/migrations/0003_gst_sets_sale.sql");
-const schemaReady = missing.length === 0 && migration3;
+if (missing.length === 0) expect(migration4, "product weight and weight-based shipping columns exist (migration 0004)", "run supabase/migrations/0004_weight_shipping.sql");
+const schemaReady = missing.length === 0 && migration3 && migration4;
+let weightsEntered = false;
 
 // ── Catalog ──────────────────────────────────────────────────────────────
 section("Catalog (compared with Website Requirement List.pdf)");
@@ -137,6 +141,13 @@ if (!schemaReady) {
         `${p.name}: description, ${p.packs.length} prices, options, specifications and ${p.images.length} images match`,
         `prices:${prices} options:${options} specs:${specs} images:${row.images.length}/${p.images.length}`);
     }
+
+    // Weights are not in the brief; an administrator enters them (Admin -> Products -> Specifications).
+    const { data: weights } = await service.from("products").select("name, weight_grams").eq("status", "published");
+    const noWeight = (weights ?? []).filter((w) => !w.weight_grams).map((w) => w.name);
+    weightsEntered = noWeight.length === 0;
+    if (weightsEntered) report("pass", "every published product has its total weight (used for shipping)");
+    else report("skip", "product weights", `not entered yet for: ${noWeight.join(", ")}. Add them in Admin -> Products; until then those products cannot be ordered`);
 
     const sample = rows.flatMap((r) => r.images)[0]?.storage_path;
     if (sample) {
@@ -184,8 +195,8 @@ if (!schemaReady) {
 // ── Orders ───────────────────────────────────────────────────────────────
 section("Order creation (a temporary test order, deleted afterwards)");
 const catalogComplete = seeded && tally.fail === 0;
-if (!schemaReady || !catalogComplete) {
-  report("skip", "order checks", !schemaReady ? "schema not applied yet" : seeded ? "catalog incomplete, fix the failures above first" : "catalog not seeded yet");
+if (!schemaReady || !catalogComplete || !weightsEntered) {
+  report("skip", "order checks", !schemaReady ? "schema not applied yet" : !seeded ? "catalog not seeded yet" : !catalogComplete ? "catalog incomplete, fix the failures above first" : "product weights not entered yet");
 } else {
   const { data: daisy } = await service
     .from("products")
@@ -232,6 +243,9 @@ if (!schemaReady || !catalogComplete) {
       `a Maharashtra delivery is taxed as CGST ₹${saved.cgst_amount} + SGST ₹${saved.sgst_amount}`, JSON.stringify(saved.tax_type));
     expect(Math.abs(taxSum - Number(saved.total)) < 0.005, `taxable value + GST adds back up to the total exactly (₹${saved.taxable_value} + tax = ₹${saved.total}), so GST is not charged on top`);
     expect(Number(saved.total) === Number(order.subtotal) + Number(saved.shipping_amount), `shipping (₹${saved.shipping_amount}) is added once to the total`);
+    const { data: shipped } = await service.from("orders").select("total_weight_grams, shipping_weight_kg, shipping_rate_per_kg, shipping_amount").eq("id", order.id).single();
+    expect(shipped.shipping_weight_kg === Math.ceil(shipped.total_weight_grams / 1000) && Number(shipped.shipping_amount) === shipped.shipping_weight_kg * Number(shipped.shipping_rate_per_kg),
+      `shipping is charged by weight (${shipped.total_weight_grams} g, charged as ${shipped.shipping_weight_kg} kg x ₹${shipped.shipping_rate_per_kg} = ₹${shipped.shipping_amount})`);
 
     const away = await service.rpc("create_order", { p_customer: { ...customer, state: "Punjab", gstin: "27aapfu0939f1zv" }, p_items: [{ variant_id: fruitSingle.id, units: [[fruit.options[0].values.find((v) => !v.is_coming_soon).id]], quantity: 1 }], p_client_hash: null });
     if (away.data?.order) {

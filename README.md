@@ -28,10 +28,11 @@ Apply the three migration files **in order**. Either:
 - **SQL Editor (no extra setup):** in the Supabase dashboard open **SQL Editor** and run the full contents of each file in `supabase/migrations/`:
   1. `0001_schema.sql` — tables, the order function, all security policies
   2. `0002_storage.sql` — image buckets and their policies
-  3. `0003_gst_sets_sale.sql` — GST, per-candle choices in sets, the sale badge; or
+  3. `0003_gst_sets_sale.sql` — GST, per-candle choices in sets, the sale badge;
+  4. `0004_weight_shipping.sql` — product weights and shipping charged per kg; or
 - **Command line:** add `SUPABASE_DB_URL` to `.env.local` (Supabase -> **Connect** -> *Session pooler* URI, with your database password) and run `npm run db:migrate`. It applies each file in a transaction, records what it applied, and is safe to re-run.
 
-If the site shows "The database needs an update", migration 0003 has not been run yet.
+If the site shows "The database needs an update", migration 0003 or 0004 has not been run yet.
 
 ### 2.2 Configure environment variables
 
@@ -151,7 +152,7 @@ Stock is deducted when an order moves to *Confirmed* (or later) and returned if 
   - ₹150 within Maharashtra at 5%: taxable ₹142.86, CGST ₹3.57, SGST ₹3.57, total ₹150.00.
   - ₹150 to Punjab at 5%: taxable ₹142.86, IGST ₹7.14, total ₹150.00.
   - The brief's examples show a taxable value of ₹142.85. That figure plus the tax comes to ₹149.99, so the site uses ₹142.86 to make the invoice add up to the ₹150 charged.
-- **Shipping:** one flat, GST-inclusive charge per order (Admin -> Settings, seeded as ₹100), added once however many items or quantities the order holds. It is taxed at the highest GST rate among the items in the order.
+- **Shipping:** charged per kg of the order's total weight, rounded up to the next whole kg (600 g is charged as 1 kg, 1.2 kg as 2 kg), at ₹80 per kg within Maharashtra and ₹120 per kg to every other state (Admin -> Settings). Each product's weight (one candle with its container) is entered in Admin -> Products -> Specifications as "Total weight"; a Set of 2 counts twice that. It is shown as "Total Weight" on the product page. **A product without a weight cannot be ordered**, because its shipping cannot be worked out. The charge is GST-inclusive and taxed at the highest GST rate among the items in the order.
 - **GSTIN:** optional at checkout. If entered it is checked for format and its check character, stored with the order and included in the WhatsApp message.
 - **Stored with every order:** tax type, seller state, taxable value, CGST, SGST, IGST, the shipping tax rate, and per line the rate, taxable value and tax. The cart, the confirmation screen, the WhatsApp message and the admin order page all show these same stored figures.
 - There is no PDF tax invoice. The admin order page shows the breakdown needed to raise one.

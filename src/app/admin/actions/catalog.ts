@@ -105,6 +105,7 @@ export async function saveProduct(input: unknown): Promise<ActionResult<{ id: st
       is_bestseller: d.is_bestseller,
       on_sale: d.on_sale,
       gst_rate: d.gst_rate,
+      weight_grams: d.weight_grams,
       sort_order: d.sort_order,
       track_inventory: d.track_inventory,
       stock_quantity: d.stock_quantity,

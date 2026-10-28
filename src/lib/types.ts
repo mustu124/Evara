@@ -83,6 +83,8 @@ export type ProductDetail = Omit<ProductSummary, "images"> & {
   status: ProductStatus;
   low_stock_threshold: number;
   gst_rate: number | null;
+  /** One candle with its container, in grams. Null until an administrator enters it. */
+  weight_grams: number | null;
   specifications: Specification[];
   options: ProductOption[];
   images: ProductImage[];
@@ -107,8 +109,10 @@ export type StoreSettings = {
   instagram_url: string;
   address: string;
   business_hours: string;
-  /** Flat, GST-inclusive charge added once per order. */
-  shipping_fee: number;
+  /** GST-inclusive shipping per kg of the order's weight (rounded up to whole kg), within the seller's state. */
+  shipping_rate_intra_per_kg: number;
+  /** The same for delivery to any other state. */
+  shipping_rate_inter_per_kg: number;
   free_shipping_above: number | null;
   /** State the business is registered in; decides CGST+SGST versus IGST. */
   seller_state: string;
@@ -194,6 +198,10 @@ export type Order = {
   sgst_amount?: number;
   igst_amount?: number;
   shipping_gst_rate?: number;
+  /** Null on orders placed before shipping was charged by weight. */
+  total_weight_grams?: number | null;
+  shipping_weight_kg?: number | null;
+  shipping_rate_per_kg?: number | null;
   created_at: string;
   updated_at: string;
   items?: OrderItem[];

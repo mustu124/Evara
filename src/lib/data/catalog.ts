@@ -21,17 +21,17 @@ const SUMMARY_SELECT = `
   variants:product_variants ( id, label, pack_quantity, price, compare_at_price, is_available, is_coming_soon, sort_order ),
   images:product_images ( storage_path, alt, sort_order )`;
 
-// Until migration 0003 has been applied the products table has no on_sale /
-// gst_rate columns. Reading still works without them (defaults are used), and
-// the check stops as soon as the columns are seen once.
+// Until migrations 0003 and 0004 have been applied the products table has no
+// on_sale / gst_rate / weight_grams columns. Reading still works without them
+// (defaults are used), and the check stops as soon as the columns are seen once.
 let hasSaleAndTaxColumns = false;
 async function modern(db: NonNullable<ReturnType<typeof getPublicClient>>): Promise<boolean> {
   if (hasSaleAndTaxColumns) return true;
-  const { error } = await db.from("products").select("on_sale").limit(1);
+  const { error } = await db.from("products").select("on_sale, weight_grams").limit(1);
   hasSaleAndTaxColumns = !error;
   return hasSaleAndTaxColumns;
 }
-const legacy = (select: string) => select.replace(", on_sale, gst_rate", "").replace(", on_sale", "");
+const legacy = (select: string) => select.replace(", on_sale, gst_rate, weight_grams", "").replace(", on_sale", "");
 
 const bySort = <T extends { sort_order: number }>(a: T, b: T) => a.sort_order - b.sort_order;
 
@@ -183,7 +183,7 @@ export async function getBestsellers(limit = 8): Promise<ProductSummary[]> {
 export const getProductBySlug = cache(async (slug: string): Promise<ProductDetail | null> => {
   const db = getPublicClient();
   if (!db) return null;
-  const detailSelect = `id, name, slug, description, status, is_coming_soon, is_bestseller, on_sale, gst_rate, specifications,
+  const detailSelect = `id, name, slug, description, status, is_coming_soon, is_bestseller, on_sale, gst_rate, weight_grams, specifications,
        track_inventory, stock_quantity, low_stock_threshold, sort_order, created_at,
        category:categories ( id, name, slug ),
        variants:product_variants ( id, label, pack_quantity, price, compare_at_price, is_available, is_coming_soon, sort_order ),
@@ -206,6 +206,7 @@ export const getProductBySlug = cache(async (slug: string): Promise<ProductDetai
     category: Array.isArray(row.category) ? (row.category[0] ?? null) : (row.category ?? null),
     on_sale: Boolean(row.on_sale),
     gst_rate: row.gst_rate === null || row.gst_rate === undefined ? null : Number(row.gst_rate),
+    weight_grams: row.weight_grams === null || row.weight_grams === undefined ? null : Number(row.weight_grams),
     specifications: Array.isArray(row.specifications) ? row.specifications : [],
     variants: (row.variants ?? []).map(mapVariant).sort(bySort),
     images: ([...(row.images ?? [])] as ProductImage[]).sort(bySort),

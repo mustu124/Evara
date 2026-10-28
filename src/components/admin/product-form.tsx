@@ -246,6 +246,14 @@ export function ProductForm({ initial, categories, collections }: Props) {
       </Panel>
 
       <Panel title="Specifications" description="Shown as a table on the product page, e.g. Dimensions, Wax Weight, Burn Time.">
+        <div className="mb-4 rounded-lg bg-blush-light/60 p-3">
+          <label htmlFor="p-weight" className={adminLabel}>Total weight (g) *</label>
+          <input id="p-weight" type="number" min={1} step={1} inputMode="numeric" placeholder="e.g. 250" aria-describedby="p-weight-hint" className={`${adminInput} max-w-40`} {...register("weight_grams", { setValueAs: priceOrNull })} />
+          <Err message={errors.weight_grams?.message} />
+          <p id="p-weight-hint" className="mt-1 text-xs text-muted">
+            One candle with its container. Shown as &ldquo;Total Weight&rdquo; on the product page and used to work out shipping: a Set of 2 counts twice this weight.
+          </p>
+        </div>
         <ul className="space-y-2">
           {specs.fields.map((field, i) => (
             <li key={field.id} className="flex flex-wrap items-start gap-2">

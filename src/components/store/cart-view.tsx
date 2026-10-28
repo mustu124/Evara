@@ -11,7 +11,8 @@ import { ArchOrnament, WhatsAppIcon } from "@/components/icons";
 import { EmptyState } from "@/components/store/bits";
 import { cart, MAX_LINE_QUANTITY, useCart, type CartLine } from "@/lib/cart";
 import { formatINR, formatINRExact, imageUrl } from "@/lib/format";
-import { buildInvoice, formatRate, type Invoice } from "@/lib/gst";
+import { buildInvoice, formatRate, isIntraState, type Invoice } from "@/lib/gst";
+import { chargeableKg, shippingCharge } from "@/lib/shipping";
 import { customerSchema, INDIAN_STATES, type CustomerInput } from "@/lib/validation";
 
 type Confirmation = Extract<PlaceOrderResult, { ok: true }>;
@@ -44,7 +45,7 @@ function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<
   const row = "flex justify-between gap-3";
   return (
     <div className={`rounded-lg border border-line bg-canvas p-3.5 ${className}`}>
-      <p className="text-xs font-medium text-cocoa">GST included in the total</p>
+      <p className="text-xs font-medium text-cocoa">Price Breakdown</p>
       <dl className="mt-2 space-y-1 text-xs text-muted">
         {stateChosen ? (
           <>
@@ -130,7 +131,10 @@ export function CartView() {
         cart.patch(updates);
       } catch {
         if (!cancelled) {
-          setReviewState({ signature, review: { ok: false, error: "We could not check your cart just now.", lines: [], subtotal: 0, shipping: 0, shippingGstRate: 0, total: 0, sellerState: "", whatsappConfigured: false } });
+          setReviewState({
+            signature,
+            review: { ok: false, error: "We could not check your cart just now.", lines: [], subtotal: 0, weightGrams: 0, shippingRates: { intra: 0, inter: 0 }, freeShippingAbove: null, shippingGstRate: 0, sellerState: "", whatsappConfigured: false },
+          });
         }
       }
     }, 250);
@@ -146,7 +150,18 @@ export function CartView() {
   const reviewed = useMemo(() => new Map((review?.lines ?? []).map((l) => [l.key, l])), [review]);
   const localSubtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
   const subtotal = review?.ok ? review.subtotal : localSubtotal;
-  const shipping = review?.ok ? review.shipping : 0;
+  // Shipping is charged per kg (rounded up) at the rate for the delivery state, so it is known once a state is chosen.
+  const shippingKg = review?.ok ? chargeableKg(review.weightGrams) : 0;
+  const shippingKnown = Boolean(review?.ok && deliveryState);
+  const shipping =
+    review?.ok && deliveryState
+      ? shippingCharge({
+          grams: review.weightGrams,
+          ratePerKg: isIntraState(deliveryState, review.sellerState) ? review.shippingRates.intra : review.shippingRates.inter,
+          subtotal,
+          freeShippingAbove: review.freeShippingAbove,
+        })
+      : 0;
   const total = subtotal + shipping;
   // GST is already inside these prices. The split (CGST + SGST, or IGST) depends on the delivery state.
   const invoice = useMemo<Invoice | null>(() => {
@@ -155,10 +170,10 @@ export function CartView() {
       const r = reviewed.get(l.key);
       return r?.ok && r.unitPrice !== undefined ? [{ amount: r.unitPrice * l.quantity, rate: r.gstRate ?? 0 }] : [];
     });
-    if (review.shipping > 0) amounts.push({ amount: review.shipping, rate: review.shippingGstRate });
+    if (shipping > 0) amounts.push({ amount: shipping, rate: review.shippingGstRate });
     // Until a state is chosen the split is unknown; the total tax is the same either way to within a paisa.
     return buildInvoice(amounts, deliveryState || "-", review.sellerState);
-  }, [review, reviewed, lines, deliveryState]);
+  }, [review, reviewed, lines, deliveryState, shipping]);
   const hasProblems = lines.some((l) => reviewed.get(l.key)?.ok === false || lineErrors[l.key]);
   const canCheckout = lines.length > 0 && !reviewing && review?.ok === true && !hasProblems && review.whatsappConfigured;
 
@@ -237,7 +252,10 @@ export function CartView() {
           <div className="card mt-4 p-5 text-left">
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(confirmation.invoice.subtotal)}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd>{confirmation.invoice.shipping > 0 ? formatINR(confirmation.invoice.shipping) : "Free"}</dd></div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Shipping{confirmation.invoice.shippingKg ? ` (${confirmation.invoice.shippingKg} kg)` : ""}</dt>
+                <dd>{confirmation.invoice.shipping > 0 ? formatINR(confirmation.invoice.shipping) : "Free"}</dd>
+              </div>
             </dl>
             <TaxBreakdown
               className="mt-3"
@@ -460,12 +478,25 @@ export function CartView() {
           <h2 id="summary-heading" className="text-2xl">Order Summary</h2>
           <dl className="mt-5 space-y-2.5 text-sm" aria-busy={reviewing}>
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(subtotal)}</dd></div>
-            <div className="flex justify-between">
-              <dt className="text-muted">Shipping</dt>
-              <dd>{shipping > 0 ? formatINR(shipping) : review?.ok && subtotal > 0 ? "Free" : "—"}</dd>
+            <div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted">Shipping{shippingKg > 0 ? ` (${shippingKg} kg)` : ""}</dt>
+                <dd className="text-right">
+                  {!review?.ok || subtotal === 0
+                    ? "—"
+                    : !shippingKnown
+                      ? step === "cart" ? "Added at checkout" : "Select your state"
+                      : shipping > 0 ? formatINR(shipping) : "Free"}
+                </dd>
+              </div>
+              {review?.ok && !shippingKnown && subtotal > 0 && (
+                <p className="mt-1 text-xs text-muted">
+                  {formatINR(review.shippingRates.intra)} per kg within {review.sellerState}, {formatINR(review.shippingRates.inter)} per kg to other states.
+                </p>
+              )}
             </div>
             <div className="flex items-baseline justify-between border-t border-line pt-4 text-base">
-              <dt className="font-medium text-cocoa">Total</dt>
+              <dt className="font-medium text-cocoa">{shippingKnown || !review?.ok ? "Total" : "Total before shipping"}</dt>
               <dd className="text-2xl font-semibold text-copper-dark">{formatINR(total)}</dd>
             </div>
           </dl>

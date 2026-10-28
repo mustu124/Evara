@@ -32,10 +32,13 @@ export type CartReview = {
   error?: string;
   lines: ReviewedLine[];
   subtotal: number;
-  shipping: number;
+  /** Total weight of the items, in grams. Shipping depends on it and on the delivery state. */
+  weightGrams: number;
+  /** GST-inclusive shipping per kg: within the seller's state, and for every other state. */
+  shippingRates: { intra: number; inter: number };
+  freeShippingAbove: number | null;
   /** GST % included in the shipping charge (the highest rate among the items). */
   shippingGstRate: number;
-  total: number;
   sellerState: string;
   whatsappConfigured: boolean;
 };
@@ -44,7 +47,7 @@ const reviewSchema = z.array(cartItemSchema.extend({ key: z.string().max(4000) }
 
 const VARIANT_SELECT = (withTax: boolean) =>
   `id, label, pack_quantity, price, compare_at_price, is_available, is_coming_soon,
-   product:products!inner ( id, name, slug, is_coming_soon, track_inventory, stock_quantity${withTax ? ", gst_rate" : ""},
+   product:products!inner ( id, name, slug, is_coming_soon, track_inventory, stock_quantity${withTax ? ", gst_rate, weight_grams" : ""},
      options:product_options ( id, name, values:product_option_values ( id, value, is_available, is_coming_soon ) ),
      images:product_images ( storage_path, option_value_id, sort_order ) )`;
 
@@ -55,7 +58,7 @@ const VARIANT_SELECT = (withTax: boolean) =>
  */
 export async function reviewCart(input: unknown): Promise<CartReview> {
   const failed = (error: string): CartReview => ({
-    ok: false, error, lines: [], subtotal: 0, shipping: 0, shippingGstRate: 0, total: 0, sellerState: "", whatsappConfigured: false,
+    ok: false, error, lines: [], subtotal: 0, weightGrams: 0, shippingRates: { intra: 0, inter: 0 }, freeShippingAbove: null, shippingGstRate: 0, sellerState: "", whatsappConfigured: false,
   });
   const parsed = reviewSchema.safeParse(input);
   if (!parsed.success) return failed("Your cart could not be read. Please refresh the page.");
@@ -67,7 +70,7 @@ export async function reviewCart(input: unknown): Promise<CartReview> {
   const loadVariants = async () => {
     if (!ids.length) return { data: [] as any[], error: null };
     const first = await db.from("product_variants").select(VARIANT_SELECT(true)).in("id", ids);
-    // A database that has not had migration 0003 applied yet has no gst_rate column.
+    // A database without migrations 0003/0004 has no gst_rate / weight_grams columns.
     if (first.error?.code === "42703") return db.from("product_variants").select(VARIANT_SELECT(false)).in("id", ids);
     return first;
   };
@@ -80,6 +83,7 @@ export async function reviewCart(input: unknown): Promise<CartReview> {
   );
   const piecesNeeded = new Map<string, number>();
   let subtotal = 0;
+  let weightGrams = 0;
   let maxRate = 0;
 
   const lines = items.map((item): ReviewedLine => {
@@ -101,6 +105,8 @@ export async function reviewCart(input: unknown): Promise<CartReview> {
     };
 
     if (p.is_coming_soon || !isVariantOrderable(v)) return { ...base, ok: false, message: "Not available to order yet." };
+    // Shipping is charged by weight, so a product without one cannot be ordered.
+    if (!p.weight_grams) return { ...base, ok: false, message: "This item cannot be ordered online just yet. Please contact us to order it." };
 
     // Every candle in the pack needs exactly one available value for every option.
     const options: any[] = p.options ?? [];
@@ -127,20 +133,21 @@ export async function reviewCart(input: unknown): Promise<CartReview> {
       }
     }
     subtotal += Number(v.price) * item.quantity;
+    weightGrams += Number(p.weight_grams) * v.pack_quantity * item.quantity;
     maxRate = Math.max(maxRate, gstRate);
     return { ...base, ok: true };
   });
 
-  // One flat shipping charge per order, however many items or quantities it holds.
-  const shipping = subtotal === 0 || (store.free_shipping_above !== null && subtotal >= store.free_shipping_above) ? 0 : store.shipping_fee;
-
+  // Shipping is worked out in the browser once the delivery state is known (lib/shipping.ts),
+  // the same way create_order() charges it.
   return {
     ok: true,
     lines,
     subtotal,
-    shipping,
+    weightGrams,
+    shippingRates: { intra: store.shipping_rate_intra_per_kg, inter: store.shipping_rate_inter_per_kg },
+    freeShippingAbove: store.free_shipping_above,
     shippingGstRate: maxRate,
-    total: subtotal + shipping,
     sellerState: store.seller_state,
     whatsappConfigured: Boolean(buildWhatsAppUrl(resolveWhatsAppNumber(store))),
   };
@@ -149,6 +156,8 @@ export async function reviewCart(input: unknown): Promise<CartReview> {
 export type OrderInvoice = {
   subtotal: number;
   shipping: number;
+  /** Weight the shipping was charged for, in whole kg (null on databases without migration 0004). */
+  shippingKg: number | null;
   total: number;
   intraState: boolean;
   rate: number | null;
@@ -226,6 +235,7 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
   const order = result.order as {
     reference: string; subtotal: number; shipping_amount: number; total: number; items: (OrderItem & { gst_rate?: number })[];
     tax_type?: string; taxable_value?: number; cgst_amount?: number; sgst_amount?: number; igst_amount?: number; shipping_gst_rate?: number;
+    shipping_weight_kg?: number | null;
   };
   // Present only once migration 0003 has been applied to the database.
   const hasTax = typeof order.tax_type === "string";
@@ -235,6 +245,7 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
   const invoice: OrderInvoice = {
     subtotal: Number(order.subtotal),
     shipping: Number(order.shipping_amount),
+    shippingKg: order.shipping_weight_kg === null || order.shipping_weight_kg === undefined ? null : Number(order.shipping_weight_kg),
     total: Number(order.total),
     intraState: order.tax_type === "intra_state",
     rate: distinct.length === 1 ? distinct[0] : null,
@@ -256,6 +267,7 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
     })),
     subtotal: invoice.subtotal,
     shipping_amount: invoice.shipping,
+    shipping_weight_kg: invoice.shippingKg,
     total: invoice.total,
     tax: hasTax
       ? { intra_state: invoice.intraState, rate: invoice.rate, taxable_value: invoice.taxable, cgst: invoice.cgst, sgst: invoice.sgst, igst: invoice.igst }

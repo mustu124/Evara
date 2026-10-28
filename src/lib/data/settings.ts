@@ -11,8 +11,9 @@ export const DEFAULT_STORE: StoreSettings = {
   instagram_url: "",
   address: "",
   business_hours: "",
-  // The real charge lives in the store settings (seeded as 100); with no settings at all nothing is charged.
-  shipping_fee: 0,
+  // The real rates live in the store settings (seeded as 80 and 120 per kg); with no settings at all nothing is charged.
+  shipping_rate_intra_per_kg: 0,
+  shipping_rate_inter_per_kg: 0,
   free_shipping_above: null,
   seller_state: "Maharashtra",
   default_gst_rate: 5,
@@ -50,7 +51,10 @@ export function normalizeSettings(rows: Row[]): SiteSettings {
   const by = new Map(rows.map((r) => [r.key, obj(r.value)]));
   const store = { ...DEFAULT_STORE, ...by.get("store") } as StoreSettings;
   store.whatsapp_number = String(store.whatsapp_number ?? "").replace(/\D/g, "");
-  store.shipping_fee = Math.max(0, Number(store.shipping_fee) || 0);
+  store.shipping_rate_intra_per_kg = Math.max(0, Number(store.shipping_rate_intra_per_kg) || 0);
+  store.shipping_rate_inter_per_kg = Math.max(0, Number(store.shipping_rate_inter_per_kg) || 0);
+  // Replaced by the per-kg rates (migration 0004).
+  delete (store as Partial<Record<string, unknown>>).shipping_fee;
   store.seller_state = String(store.seller_state || DEFAULT_STORE.seller_state).trim();
   const rate = Number(store.default_gst_rate);
   store.default_gst_rate = Number.isFinite(rate) && rate >= 0 && rate <= 40 ? rate : DEFAULT_STORE.default_gst_rate;
@@ -103,8 +107,8 @@ export const getBackendStatus = cache(async (): Promise<BackendStatus> => {
   try {
     const { error } = await client.from("site_settings").select("key").limit(1);
     if (!error) {
-      // Columns added by migration 0003 (sale badge, GST). Missing means the database needs that update.
-      const probe = await client.from("products").select("on_sale").limit(1);
+      // Columns added by migrations 0003 (sale badge, GST) and 0004 (weight). Missing means the database needs an update.
+      const probe = await client.from("products").select("on_sale, weight_grams").limit(1);
       return probe.error?.code === "42703" ? "update_needed" : "ok";
     }
     // PGRST205 / 42P01: the table does not exist, i.e. the migrations have not been run.

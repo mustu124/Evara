@@ -6,12 +6,14 @@ import { adminInput, adminLabel, btnPrimary, Notice, Panel, Spinner, useAction }
 import type { StoreSettings } from "@/lib/types";
 import { INDIAN_STATES } from "@/lib/validation";
 
-type Draft = Omit<StoreSettings, "shipping_fee" | "free_shipping_above" | "default_gst_rate"> & { shipping_fee: string; free_shipping_above: string; default_gst_rate: string };
+type Rates = "shipping_rate_intra_per_kg" | "shipping_rate_inter_per_kg";
+type Draft = Omit<StoreSettings, Rates | "free_shipping_above" | "default_gst_rate"> & Record<Rates, string> & { free_shipping_above: string; default_gst_rate: string };
 
 export function SettingsForm({ initial, envFallback }: { initial: StoreSettings; envFallback: boolean }) {
   const [draft, setDraft] = useState<Draft>({
     ...initial,
-    shipping_fee: String(initial.shipping_fee ?? 0),
+    shipping_rate_intra_per_kg: String(initial.shipping_rate_intra_per_kg ?? 0),
+    shipping_rate_inter_per_kg: String(initial.shipping_rate_inter_per_kg ?? 0),
     free_shipping_above: initial.free_shipping_above === null ? "" : String(initial.free_shipping_above),
     default_gst_rate: String(initial.default_gst_rate ?? 5),
   });
@@ -28,7 +30,7 @@ export function SettingsForm({ initial, envFallback }: { initial: StoreSettings;
       className="space-y-6"
       onSubmit={(e) => {
         e.preventDefault();
-        run(() => saveStoreSettings({ ...draft, shipping_fee: draft.shipping_fee === "" ? 0 : draft.shipping_fee }), { success: "Settings saved. The store has been updated." });
+        run(() => saveStoreSettings({ ...draft, shipping_rate_intra_per_kg: draft.shipping_rate_intra_per_kg || 0, shipping_rate_inter_per_kg: draft.shipping_rate_inter_per_kg || 0 }), { success: "Settings saved. The store has been updated." });
       }}
     >
       <Panel title="WhatsApp ordering" description="Orders are sent to this number. Customers cannot check out until it is set.">
@@ -88,11 +90,15 @@ export function SettingsForm({ initial, envFallback }: { initial: StoreSettings;
         </div>
       </Panel>
 
-      <Panel title="Shipping" description="One flat, GST-inclusive charge added once to every order. Set it to 0 to charge no shipping.">
+      <Panel title="Shipping" description="Charged per kg of the order's total weight, rounded up to the next whole kg (e.g. 1.2 kg is charged as 2 kg). GST-inclusive. Each product's weight is set on the product.">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="s-shipping_fee" className={adminLabel}>Flat shipping fee (₹)</label>
-            <input type="number" min={0} step="0.01" {...bind("shipping_fee")} />
+            <label htmlFor="s-shipping_rate_intra_per_kg" className={adminLabel}>Within {draft.seller_state} (₹ per kg)</label>
+            <input type="number" min={0} step="0.01" {...bind("shipping_rate_intra_per_kg")} />
+          </div>
+          <div>
+            <label htmlFor="s-shipping_rate_inter_per_kg" className={adminLabel}>All other states (₹ per kg)</label>
+            <input type="number" min={0} step="0.01" {...bind("shipping_rate_inter_per_kg")} />
           </div>
           <div>
             <label htmlFor="s-free_shipping_above" className={adminLabel}>Free shipping for orders of at least (₹)</label>

@@ -102,7 +102,7 @@ const fruit = (design: string, qty = 1, pack = "Single Piece") => ({
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUBS);
-  for (const file of ["0001_schema.sql", "0002_storage.sql", "0003_gst_sets_sale.sql"]) {
+  for (const file of ["0001_schema.sql", "0002_storage.sql", "0003_gst_sets_sale.sql", "0004_weight_shipping.sql"]) {
     await db.exec(readFileSync(join(__dirname, "..", "supabase", "migrations", file), "utf8"));
   }
 
@@ -125,8 +125,9 @@ beforeAll(async () => {
 
   for (const p of products) {
     const [{ id: productId }] = await q<{ id: string }>(
-      "insert into public.products (name, slug, description, category_id, status, specifications) values ($1, $2, $3, $4, 'published', $5::jsonb) returning id",
-      [p.name, slugify(p.name), p.description, categoryIds.get(p.category), JSON.stringify(p.specifications)],
+      "insert into public.products (name, slug, description, category_id, status, specifications, weight_grams) values ($1, $2, $3, $4, 'published', $5::jsonb, $6) returning id",
+      // Test weights only (the real ones are entered in the admin): 300 g per bowl jar, 150 g per shot glass.
+      [p.name, slugify(p.name), p.description, categoryIds.get(p.category), JSON.stringify(p.specifications), p.name.includes("Bowl") ? 300 : 150],
     );
     ids.product.set(p.name, productId);
     for (const [i, pack] of p.packs.entries()) {
@@ -274,7 +275,7 @@ describe("create_order", () => {
   });
 
   it("applies the administrator's shipping settings", async () => {
-    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_fee": 80, "free_shipping_above": 1000}')`);
+    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_rate_intra_per_kg": 80, "shipping_rate_inter_per_kg": 120, "free_shipping_above": 1000}')`);
     const small = await createOrder([daisy(1)]);
     expect(Number(small.order!.shipping_amount)).toBe(80);
     expect(Number(small.order!.total)).toBe(379);
@@ -282,6 +283,17 @@ describe("create_order", () => {
     expect(Number(large.order!.shipping_amount)).toBe(0);
     expect(Number(large.order!.total)).toBe(1158);
     await db.query("delete from public.site_settings where key = 'store'");
+  });
+
+  it("refuses a product whose weight has not been entered, since shipping depends on it", async () => {
+    await db.query("update public.products set weight_grams = null where id = $1", [ids.product.get("Daisy Bowl Jar Candle")]);
+    try {
+      const result = await createOrder([daisy(1)]);
+      expect(result.ok).toBe(false);
+      expect(result.errors?.[0].message).toContain("cannot be ordered online just yet");
+    } finally {
+      await db.query("update public.products set weight_grams = 300 where id = $1", [ids.product.get("Daisy Bowl Jar Candle")]);
+    }
   });
 
   it("rate-limits repeated orders from one client or phone number", async () => {
@@ -376,22 +388,30 @@ describe("GST (prices are GST-inclusive)", () => {
     }
   });
 
-  it("charges the flat shipping fee once per order and includes it in the tax breakdown", async () => {
-    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_fee": 100, "seller_state": "Maharashtra", "default_gst_rate": 5}')`);
+  it("charges shipping per kg of the order's weight, rounded up, at the rate for the delivery state", async () => {
+    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_rate_intra_per_kg": 80, "shipping_rate_inter_per_kg": 120, "seller_state": "Maharashtra", "default_gst_rate": 5}')`);
     try {
       const one = await place([fruit("Mango")], { state: "Maharashtra" });
+      // 7 x 150 g + 3 x 300 g + 2 x (4 x 150 g) = 3150 g, charged as 4 kg
       const many = await place([fruit("Mango", 7), daisy(3), fruit("Blueberry", 2, "Set of 4")], { state: "Punjab" });
       const a = await tax(one.order!.id);
       const b = await tax(many.order!.id);
-      expect(Number(a.shipping_amount)).toBe(100);
-      expect(Number(b.shipping_amount)).toBe(100);
-      expect(Number(a.total)).toBe(250);
-      expect(Number(b.total)).toBe(7 * 150 + 3 * 299 + 2 * 555 + 100);
-      // ₹150 + ₹100 at 5%: 142.86 + 95.24 taxable, 3.57 + 2.38 for each of CGST and SGST
-      expect(Number(a.shipping_taxable_value)).toBe(95.24);
+      expect(Number(a.shipping_amount)).toBe(80);
+      expect(Number(b.shipping_amount)).toBe(4 * 120);
+      expect(Number(a.total)).toBe(230);
+      expect(Number(b.total)).toBe(7 * 150 + 3 * 299 + 2 * 555 + 480);
+      const [w] = await q<Record<string, string>>("select total_weight_grams, shipping_weight_kg, shipping_rate_per_kg from public.orders where id = $1", [many.order!.id]);
+      expect([Number(w.total_weight_grams), Number(w.shipping_weight_kg), Number(w.shipping_rate_per_kg)]).toEqual([3150, 4, 120]);
+      // Exactly 1 kg is charged as 1 kg, not 2.
+      await db.query("update public.products set weight_grams = 250 where id = $1", [ids.product.get("Fruit Shot Glass Candle")]);
+      const exact = await tax((await place([fruit("Mango", 4)], { state: "Maharashtra" })).order!.id);
+      expect(Number(exact.shipping_amount)).toBe(80);
+      await db.query("update public.products set weight_grams = 150 where id = $1", [ids.product.get("Fruit Shot Glass Candle")]);
+      // 150 + 80 at 5%: 142.86 + 76.20 taxable
+      expect(Number(a.shipping_taxable_value)).toBe(76.2);
       expect(Number(a.shipping_gst_rate)).toBe(5);
-      expect(Number(a.taxable_value)).toBe(238.1);
-      expect([Number(a.cgst_amount), Number(a.sgst_amount)]).toEqual([5.95, 5.95]);
+      expect(Number(a.taxable_value)).toBe(219.06);
+      expect(Number(a.cgst_amount) + Number(a.sgst_amount) + Number(a.taxable_value)).toBeCloseTo(230, 2);
       expect(Number(b.taxable_value) + Number(b.igst_amount)).toBeCloseTo(Number(b.total), 2);
     } finally {
       await db.query("delete from public.site_settings where key = 'store'");
@@ -399,7 +419,7 @@ describe("GST (prices are GST-inclusive)", () => {
   });
 
   it("uses the configured rates: a store default and a per-product override", async () => {
-    await db.query(`insert into public.site_settings (key, value) values ('store', '{"shipping_fee": 0, "seller_state": "Punjab", "default_gst_rate": 12}')`);
+    await db.query(`insert into public.site_settings (key, value) values ('store', '{"seller_state": "Punjab", "default_gst_rate": 12}')`);
     await db.query("update public.products set gst_rate = 18 where id = $1", [ids.product.get("Daisy Bowl Jar Candle")]);
     try {
       const result = await place([fruit("Mango"), daisy(1)], { state: "Punjab" });

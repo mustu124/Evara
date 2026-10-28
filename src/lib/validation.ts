@@ -103,6 +103,15 @@ export const productSchema = z.object({
   gst_rate: z
     .union([z.literal(""), z.null(), z.coerce.number<number>().min(0, "Must be 0 or more").max(40, "Must be 40 or less")])
     .transform((v) => (v === "" || v === null ? null : v)),
+  /** One candle with its container, in grams. Shown as "Total Weight" and used for shipping. */
+  weight_grams: z
+    .number("Enter the total weight in grams")
+    .int("Use whole grams")
+    .min(1, "Enter the total weight in grams")
+    .max(100000, "Must be 100,000 g or less")
+    .nullable()
+    .refine((v) => v !== null, "Enter the total weight in grams")
+    .transform((v) => v as number),
   sort_order: z.coerce.number<number>().int().min(0).max(100000),
   track_inventory: z.boolean(),
   stock_quantity: z.coerce.number<number>().int().min(0).max(1_000_000),
@@ -171,7 +180,8 @@ export const storeSettingsSchema = z.object({
   ]),
   address: z.string().trim().max(300),
   business_hours: z.string().trim().max(120),
-  shipping_fee: money,
+  shipping_rate_intra_per_kg: money,
+  shipping_rate_inter_per_kg: money,
   free_shipping_above: z
     .union([z.literal(""), z.null(), money])
     .transform((v) => (v === "" || v === null ? null : v)),

@@ -9,6 +9,7 @@ import { WhatsAppIcon } from "@/components/icons";
 import { requireAdmin } from "@/lib/auth";
 import { formatDate, formatINR, formatINRExact, groupByCandle, imageUrl } from "@/lib/format";
 import { formatRate } from "@/lib/gst";
+import { formatWeight } from "@/lib/shipping";
 import type { Order, OrderItem } from "@/lib/types";
 import { buildWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -70,7 +71,13 @@ export default async function AdminOrderPage({ params }: { params: Promise<{ id:
             </ul>
             <dl className="mt-2 space-y-1.5 border-t border-line pt-4 text-sm">
               <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(Number(order.subtotal))}</dd></div>
-              <div className="flex justify-between"><dt className="text-muted">Shipping</dt><dd>{Number(order.shipping_amount) > 0 ? formatINR(Number(order.shipping_amount)) : "Not charged"}</dd></div>
+              <div className="flex justify-between">
+                <dt className="text-muted">
+                  Shipping
+                  {order.shipping_weight_kg ? ` (${formatWeight(Number(order.total_weight_grams))}, charged as ${order.shipping_weight_kg} kg × ${formatINR(Number(order.shipping_rate_per_kg))})` : ""}
+                </dt>
+                <dd>{Number(order.shipping_amount) > 0 ? formatINR(Number(order.shipping_amount)) : "Not charged"}</dd>
+              </div>
               <div className="flex justify-between text-base font-semibold text-cocoa"><dt>Total</dt><dd>{formatINR(Number(order.total))}</dd></div>
             </dl>
             {order.tax_type ? (

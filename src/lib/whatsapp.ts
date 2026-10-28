@@ -19,6 +19,8 @@ export type WhatsAppOrder = {
   items: Pick<OrderItem, "product_name" | "variant_label" | "pack_quantity" | "selected_options" | "unit_price" | "quantity" | "line_total">[];
   subtotal: number;
   shipping_amount: number;
+  /** Weight the shipping was charged for, in whole kg. */
+  shipping_weight_kg?: number | null;
   total: number;
   /** GST already included in the total, as stored with the order. */
   tax?: { intra_state: boolean; rate: number | null; taxable_value: number; cgst: number; sgst: number; igst: number };
@@ -54,7 +56,8 @@ export function buildOrderMessage(order: WhatsAppOrder): string {
   });
 
   lines.push("", `Subtotal: ${formatINR(order.subtotal)}`);
-  lines.push(order.shipping_amount > 0 ? `Shipping: ${formatINR(order.shipping_amount)}` : "Shipping: to be confirmed");
+  const kg = order.shipping_weight_kg ? ` (${order.shipping_weight_kg} kg)` : "";
+  lines.push(order.shipping_amount > 0 ? `Shipping${kg}: ${formatINR(order.shipping_amount)}` : "Shipping: to be confirmed");
   lines.push(`*Total: ${formatINR(order.total)}*`);
 
   if (order.tax) {

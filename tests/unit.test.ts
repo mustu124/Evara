@@ -3,6 +3,7 @@ import { formatINR, groupByCandle, productAvailability, slugify, startingPrice }
 import { buildInvoice, gstSplit, isValidGstin } from "@/lib/gst";
 import { DEFAULT_POLICIES, normalizePolicies, parsePolicy, POLICY_KEYS } from "@/lib/policies";
 import { normalizeSettings } from "@/lib/data/settings";
+import { chargeableKg, formatWeight, shippingCharge, shippingRate } from "@/lib/shipping";
 import { customerSchema, normalizeIndianMobile, orderRequestSchema, productSchema } from "@/lib/validation";
 import { buildOrderMessage, buildWhatsAppUrl } from "@/lib/whatsapp";
 
@@ -96,7 +97,7 @@ describe("customer validation", () => {
 describe("admin product validation", () => {
   const product = {
     name: "Test Candle", slug: "test-candle", description: "", category_id: "", status: "draft", is_coming_soon: false,
-    is_bestseller: false, on_sale: false, gst_rate: "", sort_order: 0, track_inventory: false, stock_quantity: 0, low_stock_threshold: 5,
+    is_bestseller: false, on_sale: false, gst_rate: "", weight_grams: 250, sort_order: 0, track_inventory: false, stock_quantity: 0, low_stock_threshold: 5,
     collection_ids: [], specifications: [], options: [],
     variants: [{ label: "Single Piece", pack_quantity: 1, price: 299, compare_at_price: 350, is_available: true, is_coming_soon: false }],
   };
@@ -109,6 +110,8 @@ describe("admin product validation", () => {
     expect(productSchema.safeParse({ ...product, variants: [{ ...product.variants[0], compare_at_price: 100 }] }).success).toBe(false);
     expect(productSchema.safeParse({ ...product, slug: "Not A Slug" }).success).toBe(false);
     expect(productSchema.safeParse({ ...product, variants: [{ ...product.variants[0], price: -1 }] }).success).toBe(false);
+    // Shipping is charged by weight, so every product needs one.
+    for (const weight_grams of [null, 0, 2.5]) expect(productSchema.safeParse({ ...product, weight_grams }).success).toBe(false);
   });
 });
 
@@ -172,14 +175,15 @@ describe("settings", () => {
   it("falls back to safe defaults and never invents a WhatsApp number", () => {
     const s = normalizeSettings([]);
     expect(s.store.whatsapp_number).toBe("");
-    expect(s.store.shipping_fee).toBe(0);
+    expect([s.store.shipping_rate_intra_per_kg, s.store.shipping_rate_inter_per_kg]).toEqual([0, 0]);
     expect(s.homepage.sections.bestsellers).toBe(true);
     expect(s.homepage.hero.slides).toEqual([]);
   });
   it("normalises stored values", () => {
-    const s = normalizeSettings([{ key: "store", value: { whatsapp_number: "+91 98765 43210", shipping_fee: "80" } }]);
+    const s = normalizeSettings([{ key: "store", value: { whatsapp_number: "+91 98765 43210", shipping_fee: 100, shipping_rate_intra_per_kg: "80", shipping_rate_inter_per_kg: 120 } }]);
     expect(s.store.whatsapp_number).toBe("919876543210");
-    expect(s.store.shipping_fee).toBe(80);
+    expect([s.store.shipping_rate_intra_per_kg, s.store.shipping_rate_inter_per_kg]).toEqual([80, 120]);
+    expect("shipping_fee" in s.store).toBe(false);
   });
 });
 
@@ -256,5 +260,35 @@ describe("editable policy pages", () => {
     expect(p.privacy.body).toBe(DEFAULT_POLICIES.privacy);
     expect(p.shipping.updated_at).toBeNull();
     for (const key of POLICY_KEYS) expect(parsePolicy(DEFAULT_POLICIES[key]).length).toBeGreaterThan(5);
+  });
+});
+
+describe("weight-based shipping", () => {
+  it("rounds the weight up to the next whole kg", () => {
+    expect([0, 1, 999, 1000, 1001, 3150].map(chargeableKg)).toEqual([0, 1, 1, 1, 2, 4]);
+  });
+  it("charges the rate for the delivery state per kg", () => {
+    const store = { seller_state: "Maharashtra", shipping_rate_intra_per_kg: 80, shipping_rate_inter_per_kg: 120 };
+    expect(shippingCharge({ grams: 600, ratePerKg: shippingRate(store, true), subtotal: 299, freeShippingAbove: null })).toBe(80);
+    expect(shippingCharge({ grams: 1200, ratePerKg: shippingRate(store, false), subtotal: 579, freeShippingAbove: null })).toBe(240);
+  });
+  it("charges nothing for an empty order or once free shipping applies", () => {
+    expect(shippingCharge({ grams: 600, ratePerKg: 80, subtotal: 0, freeShippingAbove: null })).toBe(0);
+    expect(shippingCharge({ grams: 600, ratePerKg: 80, subtotal: 1500, freeShippingAbove: 1000 })).toBe(0);
+  });
+  it("formats weights for the specifications table", () => {
+    expect([formatWeight(250), formatWeight(1000), formatWeight(1250)]).toEqual(["250 g", "1 kg", "1.25 kg"]);
+  });
+  it("shows the weight charged for in the WhatsApp message", () => {
+    const message = buildOrderMessage({
+      reference: "EV-1",
+      customer: { name: "A", phone: "+91 9000000000", address_line1: "x", city: "Pune", state: "Maharashtra", pincode: "411001" },
+      items: [],
+      subtotal: 299,
+      shipping_amount: 80,
+      shipping_weight_kg: 1,
+      total: 379,
+    });
+    expect(message).toContain("Shipping (1 kg): ₹80");
   });
 });
