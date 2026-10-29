@@ -7,8 +7,6 @@ import { ProductPurchase } from "@/components/store/product-purchase";
 import { getAllProductSlugs, getProductBySlug, getRelatedProducts } from "@/lib/data/catalog";
 import { BRAND, siteUrl } from "@/lib/env";
 import { imageUrl, isVariantOrderable, productAvailability } from "@/lib/format";
-import { formatWeight } from "@/lib/shipping";
-import type { ProductDetail, Specification } from "@/lib/types";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -36,22 +34,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-/** Adds the product's weight to its specifications as "Total Weight", next to any other weight row. */
-function withTotalWeight(product: ProductDetail): Specification[] {
-  const specs = product.specifications.filter((s) => !/^total weight$/i.test(s.label.trim()));
-  if (!product.weight_grams) return specs;
-  const sets = product.variants.some((v) => v.pack_quantity > 1);
-  const row = { label: "Total Weight", value: `${formatWeight(product.weight_grams)}${sets ? " per candle" : ""}` };
-  const after = specs.findLastIndex((s) => /weight/i.test(s.label));
-  return after === -1 ? [...specs, row] : [...specs.slice(0, after + 1), row, ...specs.slice(after + 1)];
-}
-
 export default async function ProductPage({ params }: Props) {
   const { slug } = await params;
   const product = await getProductBySlug(slug);
   if (!product) notFound();
   const related = await getRelatedProducts(product);
-  const specifications = withTotalWeight(product);
 
   const prices = product.variants.filter(isVariantOrderable).map((v) => v.price);
   const availability = productAvailability(product);
@@ -95,12 +82,12 @@ export default async function ProductPage({ params }: Props) {
           />
         </ProductPurchase>
 
-        {(specifications.length > 0 || product.collections.length > 0 || product.description) && (
+        {(product.specifications.length > 0 || product.collections.length > 0 || product.description) && (
           <section className="mx-auto mt-12 max-w-3xl border-t border-line pt-10" aria-labelledby="specs-heading">
             <h2 id="specs-heading" className="text-center text-3xl">Product Specifications</h2>
-            {specifications.length > 0 && (
+            {product.specifications.length > 0 && (
               <dl className="mt-8 divide-y divide-line border-y border-line">
-                {specifications.map((s) => (
+                {product.specifications.map((s) => (
                   <div key={s.label} className="grid gap-1 py-4 sm:grid-cols-[12rem_1fr]">
                     <dt className="text-sm font-medium text-muted">{s.label}</dt>
                     <dd className="text-cocoa">{s.value}</dd>

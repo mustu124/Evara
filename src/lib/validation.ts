@@ -103,7 +103,7 @@ export const productSchema = z.object({
   gst_rate: z
     .union([z.literal(""), z.null(), z.coerce.number<number>().min(0, "Must be 0 or more").max(40, "Must be 40 or less")])
     .transform((v) => (v === "" || v === null ? null : v)),
-  /** One candle with its container, in grams. Shown as "Total Weight" and used for shipping. */
+  /** One candle with its container, in grams. Used only for shipping; never shown to customers. */
   weight_grams: z
     .number("Enter the total weight in grams")
     .int("Use whole grams")
