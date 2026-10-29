@@ -39,16 +39,32 @@ function Req() {
   );
 }
 
-/** Taxable value, the GST contained in it (CGST + SGST or IGST, shown as one amount) and the total. */
-function TaxBreakdown({ invoice, className = "" }: { invoice: Pick<Invoice, "taxable" | "cgst" | "sgst" | "igst" | "rate" | "total">; className?: string }) {
+/** The GST already contained in the total: CGST + SGST within the seller's state, IGST otherwise. */
+function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<Invoice, "taxable" | "cgst" | "sgst" | "igst" | "intraState" | "rate" | "total">; stateChosen: boolean; className?: string }) {
+  const at = (rate: number | null, half = false) => (rate === null ? "" : ` @ ${formatRate(half ? rate / 2 : rate)}%`);
   const row = "flex justify-between gap-3";
   return (
     <div className={`rounded-lg border border-line bg-canvas p-3.5 ${className}`}>
       <p className="text-xs font-medium text-cocoa">Price Breakdown</p>
       <dl className="mt-2 space-y-1 text-xs text-muted">
-        <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
-        <div className={row}><dt>GST{invoice.rate === null ? "" : ` @ ${formatRate(invoice.rate)}%`}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
-        <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
+        {stateChosen ? (
+          <>
+            <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
+            {invoice.intraState ? (
+              <>
+                <div className={row}><dt>CGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst)}</dd></div>
+                <div className={row}><dt>SGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.sgst)}</dd></div>
+              </>
+            ) : (
+              <div className={row}><dt>IGST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.igst)}</dd></div>
+            )}
+            <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
+          </>
+        ) : (
+          <>
+            <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
+          </>
+        )}
       </dl>
     </div>
   );
@@ -240,7 +256,7 @@ export function CartView() {
                 <dd>{confirmation.invoice.shipping > 0 ? formatINR(confirmation.invoice.shipping) : "Free"}</dd>
               </div>
             </dl>
-            <TaxBreakdown className="mt-3" invoice={confirmation.invoice} />
+            <TaxBreakdown className="mt-3" stateChosen invoice={confirmation.invoice} />
           </div>
         )}
 
@@ -470,7 +486,7 @@ export function CartView() {
           </dl>
           <p className="mt-1 text-right text-xs text-muted">Prices are inclusive of applicable GST.</p>
 
-          {invoice && invoice.total > 0 && <TaxBreakdown invoice={invoice} className="mt-5" />}
+          {invoice && invoice.total > 0 && <TaxBreakdown invoice={invoice} stateChosen={Boolean(deliveryState)} className="mt-5" />}
 
           {formError && <p role="alert" className="mt-5 rounded-xl border border-blush bg-ivory px-4 py-3 text-sm text-cocoa">{formError}</p>}
           {review?.ok && !review.whatsappConfigured && (
