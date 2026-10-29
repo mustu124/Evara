@@ -267,7 +267,6 @@ export async function placeOrder(input: unknown): Promise<PlaceOrderResult> {
     })),
     subtotal: invoice.subtotal,
     shipping_amount: invoice.shipping,
-    shipping_weight_kg: invoice.shippingKg,
     total: invoice.total,
     tax: hasTax
       ? { intra_state: invoice.intraState, rate: invoice.rate, taxable_value: invoice.taxable, cgst: invoice.cgst, sgst: invoice.sgst, igst: invoice.igst }

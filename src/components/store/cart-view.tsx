@@ -12,7 +12,7 @@ import { EmptyState } from "@/components/store/bits";
 import { cart, MAX_LINE_QUANTITY, useCart, type CartLine } from "@/lib/cart";
 import { formatINR, formatINRExact, imageUrl } from "@/lib/format";
 import { buildInvoice, formatRate, isIntraState, type Invoice } from "@/lib/gst";
-import { chargeableKg, shippingCharge } from "@/lib/shipping";
+import { shippingCharge } from "@/lib/shipping";
 import { customerSchema, INDIAN_STATES, type CustomerInput } from "@/lib/validation";
 
 type Confirmation = Extract<PlaceOrderResult, { ok: true }>;
@@ -39,32 +39,16 @@ function Req() {
   );
 }
 
-/** The GST already contained in the total: CGST + SGST within the seller's state, IGST otherwise. */
-function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<Invoice, "taxable" | "cgst" | "sgst" | "igst" | "intraState" | "rate" | "total">; stateChosen: boolean; className?: string }) {
-  const at = (rate: number | null, half = false) => (rate === null ? "" : ` @ ${formatRate(half ? rate / 2 : rate)}%`);
+/** Taxable value, the GST contained in it (CGST + SGST or IGST, shown as one amount) and the total. */
+function TaxBreakdown({ invoice, className = "" }: { invoice: Pick<Invoice, "taxable" | "cgst" | "sgst" | "igst" | "rate" | "total">; className?: string }) {
   const row = "flex justify-between gap-3";
   return (
     <div className={`rounded-lg border border-line bg-canvas p-3.5 ${className}`}>
       <p className="text-xs font-medium text-cocoa">Price Breakdown</p>
       <dl className="mt-2 space-y-1 text-xs text-muted">
-        {stateChosen ? (
-          <>
-            <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
-            {invoice.intraState ? (
-              <>
-                <div className={row}><dt>CGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst)}</dd></div>
-                <div className={row}><dt>SGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.sgst)}</dd></div>
-              </>
-            ) : (
-              <div className={row}><dt>IGST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.igst)}</dd></div>
-            )}
-            <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
-          </>
-        ) : (
-          <>
-            <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
-          </>
-        )}
+        <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
+        <div className={row}><dt>GST{invoice.rate === null ? "" : ` @ ${formatRate(invoice.rate)}%`}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
+        <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
       </dl>
     </div>
   );
@@ -151,7 +135,6 @@ export function CartView() {
   const localSubtotal = lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
   const subtotal = review?.ok ? review.subtotal : localSubtotal;
   // Shipping is charged per kg (rounded up) at the rate for the delivery state, so it is known once a state is chosen.
-  const shippingKg = review?.ok ? chargeableKg(review.weightGrams) : 0;
   const shippingKnown = Boolean(review?.ok && deliveryState);
   const shipping =
     review?.ok && deliveryState
@@ -253,15 +236,11 @@ export function CartView() {
             <dl className="space-y-1.5 text-sm">
               <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(confirmation.invoice.subtotal)}</dd></div>
               <div className="flex justify-between">
-                <dt className="text-muted">Shipping{confirmation.invoice.shippingKg ? ` (${confirmation.invoice.shippingKg} kg)` : ""}</dt>
+                <dt className="text-muted">Shipping</dt>
                 <dd>{confirmation.invoice.shipping > 0 ? formatINR(confirmation.invoice.shipping) : "Free"}</dd>
               </div>
             </dl>
-            <TaxBreakdown
-              className="mt-3"
-              stateChosen
-              invoice={{ ...confirmation.invoice, total: confirmation.invoice.total }}
-            />
+            <TaxBreakdown className="mt-3" invoice={confirmation.invoice} />
           </div>
         )}
 
@@ -478,22 +457,11 @@ export function CartView() {
           <h2 id="summary-heading" className="text-2xl">Order Summary</h2>
           <dl className="mt-5 space-y-2.5 text-sm" aria-busy={reviewing}>
             <div className="flex justify-between"><dt className="text-muted">Subtotal</dt><dd>{formatINR(subtotal)}</dd></div>
-            <div>
-              <div className="flex justify-between gap-3">
-                <dt className="text-muted">Shipping{shippingKg > 0 ? ` (${shippingKg} kg)` : ""}</dt>
-                <dd className="text-right">
-                  {!review?.ok || subtotal === 0
-                    ? "—"
-                    : !shippingKnown
-                      ? step === "cart" ? "Added at checkout" : "Select your state"
-                      : shipping > 0 ? formatINR(shipping) : "Free"}
-                </dd>
-              </div>
-              {review?.ok && !shippingKnown && subtotal > 0 && (
-                <p className="mt-1 text-xs text-muted">
-                  {formatINR(review.shippingRates.intra)} per kg within {review.sellerState}, {formatINR(review.shippingRates.inter)} per kg to other states.
-                </p>
-              )}
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted">Shipping</dt>
+              <dd className="text-right">
+                {!review?.ok || subtotal === 0 ? "—" : !shippingKnown ? "Added at checkout" : shipping > 0 ? formatINR(shipping) : "Free"}
+              </dd>
             </div>
             <div className="flex items-baseline justify-between border-t border-line pt-4 text-base">
               <dt className="font-medium text-cocoa">{shippingKnown || !review?.ok ? "Total" : "Total before shipping"}</dt>
@@ -502,7 +470,7 @@ export function CartView() {
           </dl>
           <p className="mt-1 text-right text-xs text-muted">Prices are inclusive of applicable GST.</p>
 
-          {invoice && invoice.total > 0 && <TaxBreakdown invoice={invoice} stateChosen={Boolean(deliveryState)} className="mt-5" />}
+          {invoice && invoice.total > 0 && <TaxBreakdown invoice={invoice} className="mt-5" />}
 
           {formError && <p role="alert" className="mt-5 rounded-xl border border-blush bg-ivory px-4 py-3 text-sm text-cocoa">{formError}</p>}
           {review?.ok && !review.whatsappConfigured && (

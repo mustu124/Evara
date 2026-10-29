@@ -279,16 +279,16 @@ describe("weight-based shipping", () => {
   it("formats weights for the specifications table", () => {
     expect([formatWeight(250), formatWeight(1000), formatWeight(1250)]).toEqual(["250 g", "1 kg", "1.25 kg"]);
   });
-  it("shows the weight charged for in the WhatsApp message", () => {
+  it("keeps the shipping calculation out of the WhatsApp message", () => {
     const message = buildOrderMessage({
       reference: "EV-1",
       customer: { name: "A", phone: "+91 9000000000", address_line1: "x", city: "Pune", state: "Maharashtra", pincode: "411001" },
       items: [],
       subtotal: 299,
       shipping_amount: 80,
-      shipping_weight_kg: 1,
       total: 379,
     });
-    expect(message).toContain("Shipping (1 kg): ₹80");
+    expect(message).toContain("Shipping: ₹80");
+    expect(message).not.toContain("kg");
   });
 });
