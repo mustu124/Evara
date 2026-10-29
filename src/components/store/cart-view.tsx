@@ -47,24 +47,18 @@ function TaxBreakdown({ invoice, stateChosen, className = "" }: { invoice: Pick<
     <div className={`rounded-lg border border-line bg-canvas p-3.5 ${className}`}>
       <p className="text-xs font-medium text-cocoa">Price Breakdown</p>
       <dl className="mt-2 space-y-1 text-xs text-muted">
-        {stateChosen ? (
+        <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
+        {!stateChosen ? (
+          <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
+        ) : invoice.intraState ? (
           <>
-            <div className={row}><dt>Taxable value</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.taxable)}</dd></div>
-            {invoice.intraState ? (
-              <>
-                <div className={row}><dt>CGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst)}</dd></div>
-                <div className={row}><dt>SGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.sgst)}</dd></div>
-              </>
-            ) : (
-              <div className={row}><dt>IGST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.igst)}</dd></div>
-            )}
-            <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
+            <div className={row}><dt>CGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst)}</dd></div>
+            <div className={row}><dt>SGST{at(invoice.rate, true)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.sgst)}</dd></div>
           </>
         ) : (
-          <>
-            <div className={row}><dt>GST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.cgst + invoice.sgst + invoice.igst)}</dd></div>
-          </>
+          <div className={row}><dt>IGST{at(invoice.rate)}</dt><dd className="tabular-nums text-cocoa">{formatINRExact(invoice.igst)}</dd></div>
         )}
+        <div className={`${row} border-t border-line pt-1 font-medium text-cocoa`}><dt>Total invoice value</dt><dd className="tabular-nums">{formatINRExact(invoice.total)}</dd></div>
       </dl>
     </div>
   );
